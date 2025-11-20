@@ -57,6 +57,20 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        medical: {
+          pediatria: "hsl(var(--pediatria))",
+          go: "hsl(var(--go))",
+          preventiva: "hsl(var(--preventiva))",
+          clinica: "hsl(var(--clinica))",
+          cirurgia: "hsl(var(--cirurgia))",
+        },
+        chart: {
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
