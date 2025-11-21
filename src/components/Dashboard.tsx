@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Target, TrendingUp, Calendar, Award, Flame, Zap, Trophy, Activity } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Target, TrendingUp, Calendar, Award, Flame, Zap, Trophy, Activity, BrainCircuit, Edit2, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,9 @@ function getLevelInfo(xp: number) {
 }
 
 export default function Dashboard({ exercises, classes, pendingReviews, goals, setGoals, userProgress }: DashboardProps) {
+  const [isEditingGoals, setIsEditingGoals] = useState(false);
+  const [tempGoals, setTempGoals] = useState(goals);
+
   const last7Days = exercises.filter(ex => {
     const diff = Date.now() - new Date(ex.date).getTime();
     return diff <= 7 * 24 * 60 * 60 * 1000;
@@ -175,105 +178,202 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
         </CardContent>
       </Card>
 
-      {/* Metas da Semana */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5" />
-            Metas da Semana
-          </CardTitle>
-          <CardDescription>Defina e acompanhe seus objetivos</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Questões por Semana</Label>
+      {/* Metas da Semana - Tactical HUD Style */}
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 dark:to-black border-b-4 border-perry-accent p-6">
+        {/* Background Decoration */}
+        <div className="absolute top-0 right-0 -mr-8 -mt-8">
+          <BrainCircuit className="w-48 h-48 text-white opacity-10 rotate-12" />
+        </div>
+
+        {/* Header */}
+        <div className="relative z-10 flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Target className="w-6 h-6 text-perry-accent" />
+            <h2 className="text-2xl font-bold text-white">Metas da Semana</h2>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (isEditingGoals) {
+                setGoals(tempGoals);
+              } else {
+                setTempGoals(goals);
+              }
+              setIsEditingGoals(!isEditingGoals);
+            }}
+            className="text-white hover:bg-white/10"
+          >
+            {isEditingGoals ? (
+              <>
+                <Save className="w-4 h-4 mr-2 text-green-400" />
+                Salvar
+              </>
+            ) : (
+              <>
+                <Edit2 className="w-4 h-4 mr-2" />
+                Editar
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Glassmorphism Cards */}
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Questões por Semana */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white/70">Questões por Semana</span>
+              <Zap className="w-5 h-5 text-perry-accent" />
+            </div>
+            
+            {isEditingGoals ? (
               <Input
                 type="number"
-                value={goals.weeklyQuestions}
-                onChange={(e) => setGoals({ ...goals, weeklyQuestions: Number(e.target.value) })}
+                value={tempGoals.weeklyQuestions}
+                onChange={(e) => setTempGoals({ ...tempGoals, weeklyQuestions: Number(e.target.value) })}
+                className="bg-slate-700 border-slate-600 text-white"
               />
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Progresso:</span>
-                <span className={weeklyQuestions >= goals.weeklyQuestions ? 'text-performance-success font-semibold' : ''}>
-                  {weeklyQuestions}/{goals.weeklyQuestions}
-                </span>
+            ) : (
+              <div className="text-3xl font-black text-white">
+                {goals.weeklyQuestions}
               </div>
-              <Progress value={(weeklyQuestions / goals.weeklyQuestions) * 100} />
+            )}
+
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-white/50">Progresso:</span>
+              <span className={`font-bold ${weeklyQuestions >= goals.weeklyQuestions ? 'text-green-400' : 'text-white'}`}>
+                {weeklyQuestions}/{goals.weeklyQuestions}
+              </span>
             </div>
 
-            <div className="space-y-2">
-              <Label>Taxa de Acerto Alvo (%)</Label>
-              <Input
-                type="number"
-                value={goals.targetAccuracy}
-                onChange={(e) => setGoals({ ...goals, targetAccuracy: Number(e.target.value) })}
+            <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
+              <div 
+                className="absolute inset-y-0 left-0 bg-perry-accent rounded-full transition-all duration-500"
+                style={{ width: `${Math.min((weeklyQuestions / goals.weeklyQuestions) * 100, 100)}%` }}
               />
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Atual:</span>
-                <span className={weeklyAccuracy >= goals.targetAccuracy ? 'text-medical-preventiva font-semibold' : ''}>
-                  {weeklyAccuracy.toFixed(1)}%
-                </span>
-              </div>
-              <Progress value={weeklyAccuracy} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tópicos Diferentes</Label>
-              <Input
-                type="number"
-                value={goals.targetTopicsPerWeek}
-                onChange={(e) => setGoals({ ...goals, targetTopicsPerWeek: Number(e.target.value) })}
-              />
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Progresso:</span>
-                <span className={uniqueTopics >= goals.targetTopicsPerWeek ? 'text-performance-success font-semibold' : ''}>
-                  {uniqueTopics}/{goals.targetTopicsPerWeek}
-                </span>
-              </div>
-              <Progress value={(uniqueTopics / goals.targetTopicsPerWeek) * 100} />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Heatmap */}
+          {/* Taxa de Acerto */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white/70">Taxa de Acerto Alvo</span>
+              <Trophy className="w-5 h-5 text-green-400" />
+            </div>
+            
+            {isEditingGoals ? (
+              <Input
+                type="number"
+                value={tempGoals.targetAccuracy}
+                onChange={(e) => setTempGoals({ ...tempGoals, targetAccuracy: Number(e.target.value) })}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            ) : (
+              <div className="text-3xl font-black text-white">
+                {goals.targetAccuracy}%
+              </div>
+            )}
+
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-white/50">Atual:</span>
+              <span className={`font-bold ${weeklyAccuracy >= goals.targetAccuracy ? 'text-green-400' : 'text-white'}`}>
+                {weeklyAccuracy.toFixed(1)}%
+              </span>
+            </div>
+
+            <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
+              <div 
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
+                  weeklyAccuracy >= goals.targetAccuracy ? 'bg-perry-teal' : 'bg-yellow-500'
+                }`}
+                style={{ width: `${Math.min(weeklyAccuracy, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Tópicos Diferentes */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-white/70">Tópicos Diferentes</span>
+              <BrainCircuit className="w-5 h-5 text-purple-400" />
+            </div>
+            
+            {isEditingGoals ? (
+              <Input
+                type="number"
+                value={tempGoals.targetTopicsPerWeek}
+                onChange={(e) => setTempGoals({ ...tempGoals, targetTopicsPerWeek: Number(e.target.value) })}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            ) : (
+              <div className="text-3xl font-black text-white">
+                {goals.targetTopicsPerWeek}
+              </div>
+            )}
+
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-white/50">Progresso:</span>
+              <span className={`font-bold ${uniqueTopics >= goals.targetTopicsPerWeek ? 'text-green-400' : 'text-white'}`}>
+                {uniqueTopics}/{goals.targetTopicsPerWeek}
+              </span>
+            </div>
+
+            <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
+              <div 
+                className="absolute inset-y-0 left-0 bg-purple-500 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min((uniqueTopics / goals.targetTopicsPerWeek) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Consistência de Estudos - Activity Garden */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            Mapa de Calor de Consistência
+            <Activity className="w-5 h-5 text-perry-teal" />
+            Consistência de Estudos
           </CardTitle>
-          <CardDescription>Últimos 6 meses - Quanto mais escuro, maior a intensidade</CardDescription>
+          <CardDescription>Últimos 6 meses - Não deixe buracos cinzas no seu jardim!</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <div className="inline-flex gap-1 flex-wrap" style={{ maxWidth: '100%' }}>
+          <div className="overflow-x-auto pb-2">
+            <div className="inline-flex gap-1 flex-wrap min-w-full">
               {heatmapData.map((day, i) => {
-                let color = 'bg-heatmap-empty';
+                let color = 'bg-slate-100 dark:bg-slate-800';
                 if (day.count > 0) {
-                  if (day.count >= 50) color = 'bg-heatmap-high'; // Perry Teal
-                  else if (day.count >= 25) color = 'bg-heatmap-medium'; // Teal-400
-                  else if (day.count >= 10) color = 'bg-heatmap-low'; // Teal-200
-                  else color = 'bg-heatmap-low opacity-50';
+                  if (day.count >= 50) color = 'bg-perry-teal';
+                  else if (day.count >= 11) color = 'bg-teal-300';
+                  else if (day.count >= 1) color = 'bg-teal-200';
                 }
                 return (
                   <div
                     key={i}
-                    className={`w-3 h-3 rounded-sm ${color} hover:ring-2 hover:ring-primary transition-all cursor-pointer`}
+                    className={`w-3 h-3 md:w-4 md:h-4 rounded-sm ${color} hover:ring-2 hover:ring-perry-accent transition-all cursor-pointer relative group`}
                     title={`${day.date}: ${day.count} questões`}
-                  />
+                  >
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      {new Date(day.date).toLocaleDateString('pt-BR')}: {day.count} questões
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900" />
+                    </div>
+                  </div>
                 );
               })}
             </div>
-            <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
-              <span>Menos</span>
-              <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />
-              <div className="w-3 h-3 rounded-sm bg-heatmap-low opacity-50" />
-              <div className="w-3 h-3 rounded-sm bg-heatmap-low" />
-              <div className="w-3 h-3 rounded-sm bg-heatmap-medium" />
-              <div className="w-3 h-3 rounded-sm bg-heatmap-high" />
-              <span>Mais</span>
+            
+            {/* Legend */}
+            <div className="flex items-center gap-3 mt-6 text-xs text-muted-foreground">
+              <span className="font-medium">Menos</span>
+              <div className="flex gap-1">
+                <div className="w-4 h-4 rounded-sm bg-slate-100 dark:bg-slate-800 border border-border" title="Sem estudo" />
+                <div className="w-4 h-4 rounded-sm bg-teal-200" title="1-10 questões" />
+                <div className="w-4 h-4 rounded-sm bg-teal-300" title="11-30 questões" />
+                <div className="w-4 h-4 rounded-sm bg-perry-teal" title="50+ questões (Meta batida!)" />
+              </div>
+              <span className="font-medium">Mais</span>
             </div>
           </div>
         </CardContent>
