@@ -10,6 +10,7 @@ import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import jsPDF from 'jspdf';
+import { getPerformanceColor } from '@/lib/utils';
 
 interface ExamsProps {
   exams: ExamLog[];
@@ -307,7 +308,7 @@ export default function Exams({ exams, setExams }: ExamsProps) {
                             {exam.correctAnswers}/{exam.totalQuestions} acertos
                           </span>
                           <span>•</span>
-                          <span className={accuracy >= 80 ? 'text-medical-preventiva font-medium' : accuracy >= 60 ? 'text-medical-clinica' : 'text-destructive font-medium'}>
+                          <span className={getPerformanceColor(accuracy)}>
                             {accuracy.toFixed(1)}%
                           </span>
                         </div>
@@ -360,11 +361,7 @@ export default function Exams({ exams, setExams }: ExamsProps) {
                                     <span className="text-muted-foreground">
                                       {ad.correct}/{ad.total} acertos
                                     </span>
-                                    <span className={`font-bold ${
-                                      areaAccuracy >= 80 ? 'text-medical-preventiva' : 
-                                      areaAccuracy >= 60 ? 'text-medical-clinica' : 
-                                      'text-destructive'
-                                    }`}>
+                                    <span className={`font-bold ${getPerformanceColor(areaAccuracy)}`}>
                                       {areaAccuracy.toFixed(1)}%
                                     </span>
                                   </div>

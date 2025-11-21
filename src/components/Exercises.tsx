@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ExerciseLog, MedicalArea } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
+import { getPerformanceColor } from '@/lib/utils';
 
 interface ExercisesProps {
   exercises: ExerciseLog[];
@@ -203,7 +204,7 @@ export default function Exercises({ exercises, setExercises }: ExercisesProps) {
                       <span className="font-medium text-foreground">
                         {ex.correctAnswers}/{ex.totalQuestions}
                       </span>
-                      <span className={accuracy >= 80 ? 'text-medical-preventiva' : accuracy >= 60 ? 'text-medical-clinica' : 'text-destructive'}>
+                      <span className={getPerformanceColor(accuracy)}>
                         {accuracy.toFixed(0)}%
                       </span>
                     </div>

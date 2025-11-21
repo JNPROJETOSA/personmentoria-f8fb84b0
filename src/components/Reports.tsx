@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ExerciseLog, ClassItem, ExamLog, MedicalArea } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import { getPerformanceColor } from '@/lib/utils';
 
 interface ReportsProps {
   exercises: ExerciseLog[];
@@ -294,7 +295,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
                 <CardDescription>Acurácia</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className={`text-3xl font-bold ${accuracy >= 80 ? 'text-medical-preventiva' : accuracy >= 60 ? 'text-medical-clinica' : 'text-destructive'}`}>
+                <div className={`text-3xl font-bold ${getPerformanceColor(accuracy)}`}>
                   {accuracy.toFixed(1)}%
                 </div>
               </CardContent>

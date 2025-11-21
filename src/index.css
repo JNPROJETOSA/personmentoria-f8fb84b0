@@ -17,7 +17,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 27%;
 
-    --primary: 217 91% 60%;
+    /* Perry Brand Colors */
+    --primary: 173 58% 39%; /* Perry Teal #0d9488 */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 214 32% 91%;
@@ -26,7 +27,7 @@ All colors MUST be HSL.
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 217 91% 60%;
+    --accent: 25 95% 53%; /* Perry Accent Orange #f97316 */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -34,84 +35,107 @@ All colors MUST be HSL.
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --ring: 173 58% 39%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 215 25% 27%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 173 58% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96%;
     --sidebar-accent-foreground: 215 25% 27%;
     --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 173 58% 39%;
 
     /* Medical area colors */
-    --pediatria: 217 91% 60%;
-    --go: 330 81% 60%;
-    --preventiva: 142 71% 45%;
-    --clinica: 38 92% 50%;
-    --cirurgia: 239 84% 67%;
+    --medical-pediatria: 217 91% 60%; /* Blue Royal #3B82F6 */
+    --medical-go: 330 81% 60%; /* Pink #EC4899 */
+    --medical-preventiva: 160 84% 39%; /* Emerald #10B981 */
+    --medical-clinica: 38 92% 50%; /* Amber #F59E0B */
+    --medical-cirurgia: 239 84% 67%; /* Indigo #6366F1 */
+
+    /* Performance Semaphore Colors */
+    --success: 160 84% 39%; /* Emerald Green >80% */
+    --warning: 38 92% 50%; /* Amber 60-79% */
+    --danger: 0 84% 60%; /* Red <60% */
+
+    /* Heatmap Scale (Teal monochromatic) */
+    --heatmap-empty: 210 40% 96%; /* Slate-100 */
+    --heatmap-low: 173 76% 70%; /* Teal-200 */
+    --heatmap-medium: 173 58% 50%; /* Teal-400 */
+    --heatmap-high: 173 58% 39%; /* Teal-600 Perry Teal */
 
     /* Charts and data viz */
     --chart-1: 217 91% 60%;
     --chart-2: 330 81% 60%;
-    --chart-3: 142 71% 45%;
+    --chart-3: 160 84% 39%;
     --chart-4: 38 92% 50%;
     --chart-5: 239 84% 67%;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    --background: 222 47% 11%; /* Slate-950 not pure black */
+    --foreground: 210 40% 96%; /* Slate-100 not pure white */
 
-    --card: 217 33% 17%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 47% 17%; /* Slate-900 */
+    --card-foreground: 210 40% 96%;
 
     --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 217 91% 60%;
+    /* Perry Brand Colors (same in dark) */
+    --primary: 173 58% 39%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 210 40% 96%;
 
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 91% 60%;
+    --accent: 25 95% 53%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 210 40% 96%;
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --ring: 173 58% 39%;
 
     --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 173 58% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 173 58% 39%;
 
-    /* Medical area colors - slightly adjusted for dark mode */
-    --pediatria: 217 91% 60%;
-    --go: 330 81% 60%;
-    --preventiva: 142 71% 45%;
-    --clinica: 38 92% 50%;
-    --cirurgia: 239 84% 67%;
+    /* Medical area colors (same) */
+    --medical-pediatria: 217 91% 60%;
+    --medical-go: 330 81% 60%;
+    --medical-preventiva: 160 84% 39%;
+    --medical-clinica: 38 92% 50%;
+    --medical-cirurgia: 239 84% 67%;
+
+    /* Performance Semaphore Colors (adjusted for dark) */
+    --success: 160 84% 45%;
+    --warning: 38 92% 55%;
+    --danger: 0 84% 60%;
+
+    /* Heatmap Scale (adjusted for dark) */
+    --heatmap-empty: 222 47% 17%;
+    --heatmap-low: 173 76% 40%;
+    --heatmap-medium: 173 58% 45%;
+    --heatmap-high: 173 58% 50%;
 
     /* Charts */
     --chart-1: 217 91% 60%;
     --chart-2: 330 81% 60%;
-    --chart-3: 142 71% 45%;
-    --chart-4: 38 92% 50%;
+    --chart-3: 160 84% 45%;
+    --chart-4: 38 92% 55%;
     --chart-5: 239 84% 67%;
   }
 }

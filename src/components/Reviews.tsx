@@ -5,6 +5,7 @@ import { ReviewItem, ManualReviewLog } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getPerformanceColor } from '@/lib/utils';
 
 interface ReviewsProps {
   reviews: ReviewItem[];
@@ -45,13 +46,13 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
           <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
             <span>{review.area}</span>
             <span>•</span>
-            <span className={isOverdue ? 'text-destructive font-medium' : ''}>
+            <span className={isOverdue ? 'text-performance-danger font-medium' : ''}>
               {isOverdue ? 'Atrasada' : 'Hoje'}: {new Date(review.dueDate).toLocaleDateString('pt-BR')}
             </span>
             <span>•</span>
             <span>Intervalo: {review.dayInterval} dias</span>
             <span>•</span>
-            <span className={review.accuracy >= 80 ? 'text-medical-preventiva' : review.accuracy >= 60 ? 'text-medical-clinica' : 'text-destructive'}>
+            <span className={getPerformanceColor(review.accuracy)}>
               {review.accuracy.toFixed(0)}% acerto
             </span>
           </div>
