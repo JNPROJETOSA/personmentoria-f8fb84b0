@@ -52,9 +52,12 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [expandedSubareas, setExpandedSubareas] = useState<Set<string>>(new Set());
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
+  const [isAddSubareaDialogOpen, setIsAddSubareaDialogOpen] = useState(false);
   const [selectedAreaForTopic, setSelectedAreaForTopic] = useState<string>('');
+  const [selectedAreaForSubarea, setSelectedAreaForSubarea] = useState<string>('');
   const [selectedSubareaForTopic, setSelectedSubareaForTopic] = useState<string>('');
   const [newTopicName, setNewTopicName] = useState('');
+  const [newSubareaName, setNewSubareaName] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<{ areaId: string; subareaId: string; topicId: string } | null>(null);
 
   const calculateProgress = () => {
@@ -185,6 +188,39 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
 
     setNewTopicName('');
     setIsAddTopicDialogOpen(false);
+  };
+
+  const addCustomSubarea = () => {
+    if (!newSubareaName.trim() || !selectedAreaForSubarea) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos para adicionar a subárea.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updatedData = { ...editorialData };
+    const area = updatedData.areas.find(a => a.id === selectedAreaForSubarea);
+    if (!area) return;
+
+    const newSubarea: EditorialSubarea = {
+      id: `custom-subarea-${Date.now()}`,
+      name: newSubareaName.trim(),
+      topics: []
+    };
+
+    area.subareas.push(newSubarea);
+    setEditorialData(updatedData);
+
+    toast({
+      title: "Subárea Adicionada!",
+      description: `${newSubareaName} foi adicionada com sucesso em ${area.name}.`,
+    });
+
+    setNewSubareaName('');
+    setSelectedAreaForSubarea('');
+    setIsAddSubareaDialogOpen(false);
   };
 
   const handleQuickAction = (topicName: string, action: 'exercises' | 'flashcard' | 'class') => {
@@ -333,7 +369,7 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
         })}
       </div>
 
-      {/* Add Custom Topic */}
+      {/* Add Custom Items */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -341,13 +377,58 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
             Personalizar Edital
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2">
+          <Button onClick={() => setIsAddSubareaDialogOpen(true)} variant="outline" className="w-full">
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar Subárea Personalizada
+          </Button>
           <Button onClick={() => setIsAddTopicDialogOpen(true)} variant="outline" className="w-full">
             <Plus className="w-4 h-4 mr-2" />
             Adicionar Tópico Personalizado
           </Button>
         </CardContent>
       </Card>
+
+      {/* Add Subarea Dialog */}
+      <Dialog open={isAddSubareaDialogOpen} onOpenChange={setIsAddSubareaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Subárea Personalizada</DialogTitle>
+            <DialogDescription>
+              Crie uma nova subárea dentro de uma grande área médica
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="area-select-subarea">Grande Área</Label>
+              <Select value={selectedAreaForSubarea} onValueChange={setSelectedAreaForSubarea}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a área" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {editorialData.areas.map(area => (
+                    <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subarea-name">Nome da Subárea</Label>
+              <Input
+                id="subarea-name"
+                placeholder="Ex: Reumatologia Pediátrica"
+                value={newSubareaName}
+                onChange={(e) => setNewSubareaName(e.target.value)}
+              />
+            </div>
+
+            <Button onClick={addCustomSubarea} className="w-full">
+              Adicionar Subárea
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Topic Dialog */}
       <Dialog open={isAddTopicDialogOpen} onOpenChange={setIsAddTopicDialogOpen}>
