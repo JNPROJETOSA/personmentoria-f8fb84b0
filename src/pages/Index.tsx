@@ -29,13 +29,18 @@ import { useFlashcards } from '@/hooks/useFlashcards';
 import { useGoals } from '@/hooks/useGoals';
 import { useDreamBoard } from '@/hooks/useDreamBoard';
 import { useNotebook } from '@/hooks/useNotebook';
+import { useExams } from '@/hooks/useExams';
+import { useReviews } from '@/hooks/useReviews';
+import { useEditorial } from '@/hooks/useEditorial';
+import { useBurnout } from '@/hooks/useBurnout';
+import { useExamMode } from '@/hooks/useExamMode';
 
 const AuthenticatedApp = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
-  const { profile } = useProfile(user?.id);
+  const { profile, updateProfile } = useProfile(user?.id);
   
   // Cloud database hooks
   const { classes, addClass, updateClass, deleteClass } = useClasses(user?.id);
@@ -44,47 +49,25 @@ const AuthenticatedApp = () => {
   const { goals, updateGoals } = useGoals(user?.id);
   const { items: dreamBoardItems, addItem: addDreamItem, deleteItem: deleteDreamItem } = useDreamBoard(user?.id);
   const { notebookData, updateNotebook } = useNotebook(user?.id);
-  
-  const storagePrefix = `perry_${user?.id}_`;
+  const { exams, addExam, deleteExam } = useExams(user?.id);
+  const { reviews: manualReviews, addReview } = useReviews(user?.id);
+  const { editorialData, updateTopicStatus, setEditorialData } = useEditorial(user?.id);
+  const { burnoutData, addCheckIn: addBurnoutCheckIn, setBurnoutData } = useBurnout(user?.id);
+  const { examModeData, addSession: addExamSession, updateMantra, setExamModeData } = useExamMode(user?.id);
 
-  const [exams, setExams] = useState<ExamLog[]>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'exams');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // UserProgress from profile
+  const userProgress: UserProgress = {
+    xp: profile?.xp || 0,
+    level: profile?.level || 1,
+    streak: profile?.streak || 0,
+    lastStudyDate: profile?.last_study_date || null,
+    totalActivities: (exercises.length + exams.length + classes.filter(c => c.studied).length) || 0
+  };
 
-  const [manualReviews, setManualReviews] = useState<ManualReviewLog[]>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'manual_reviews');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [userProgress, setUserProgress] = useState<UserProgress>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'user_progress');
-    return saved ? JSON.parse(saved) : {
-      xp: 0,
-      level: 1,
-      streak: 0,
-      lastStudyDate: null,
-      totalActivities: 0
-    };
-  });
-
-  const [editorialData, setEditorialData] = useState<EditorialData>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'editorial');
-    return saved ? JSON.parse(saved) : EDITORIAL_TEMPLATE;
-  });
-
-  const [burnoutData, setBurnoutData] = useState<BurnoutData>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'burnout');
-    return saved ? JSON.parse(saved) : { checkIns: [] };
-  });
-
-  const [examModeData, setExamModeData] = useState<ExamModeData>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'exam_mode');
-    return saved ? JSON.parse(saved) : { sessions: [], mantra: '' };
-  });
-
-  // Update XP and streak when exercises, exams, or classes change
+  // Update profile in cloud when exercises, exams, or classes change
   useEffect(() => {
+    if (!profile || !user?.id) return;
+
     const today = new Date().toISOString().split('T')[0];
     const totalActivities = exercises.length + exams.length + classes.filter(c => c.studied).length;
     
@@ -95,9 +78,9 @@ const AuthenticatedApp = () => {
     const totalXP = exerciseXP + classXP + examXP;
 
     // Update streak
-    let newStreak = userProgress.streak;
-    if (userProgress.lastStudyDate) {
-      const lastDate = new Date(userProgress.lastStudyDate);
+    let newStreak = profile.streak;
+    if (profile.last_study_date) {
+      const lastDate = new Date(profile.last_study_date);
       const todayDate = new Date(today);
       const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -112,34 +95,16 @@ const AuthenticatedApp = () => {
 
     const hasActivityToday = exercises.some(ex => ex.date === today) || exams.some(ex => ex.date === today);
 
-    setUserProgress({
+    updateProfile({
       xp: totalXP,
       level: Math.floor(totalXP / 100) + 1,
       streak: newStreak,
-      lastStudyDate: hasActivityToday ? today : userProgress.lastStudyDate,
-      totalActivities
+      last_study_date: hasActivityToday ? today : profile.last_study_date
     });
-  }, [exercises, exams, classes]);
-
-  // Classes, exercises, and flashcards now sync automatically via hooks
-  useEffect(() => { localStorage.setItem(storagePrefix + 'exams', JSON.stringify(exams)); }, [exams]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'notebook', JSON.stringify(notebookData)); }, [notebookData]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'manual_reviews', JSON.stringify(manualReviews)); }, [manualReviews]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'goals', JSON.stringify(goals)); }, [goals]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'user_progress', JSON.stringify(userProgress)); }, [userProgress]);
-  
-  useEffect(() => { localStorage.setItem(storagePrefix + 'dream_board', JSON.stringify(dreamBoardItems)); }, [dreamBoardItems]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'editorial', JSON.stringify(editorialData)); }, [editorialData]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'burnout', JSON.stringify(burnoutData)); }, [burnoutData]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'exam_mode', JSON.stringify(examModeData)); }, [examModeData]);
+  }, [exercises.length, exams.length, classes.filter(c => c.studied).length]);
 
   const handleMarkReviewed = (topic: string) => {
-    const log: ManualReviewLog = {
-      id: Date.now().toString(),
-      topic,
-      date: new Date().toISOString().split('T')[0]
-    };
-    setManualReviews(prev => [...prev, log]);
+    addReview(topic);
   };
 
   const pendingReviews = useMemo(() => {
@@ -184,10 +149,11 @@ const AuthenticatedApp = () => {
   }, [exercises, manualReviews, classes]);
 
   const handleAddXP = (xp: number) => {
-    setUserProgress(prev => ({
-      ...prev,
-      xp: prev.xp + xp
-    }));
+    if (profile) {
+      updateProfile({
+        xp: profile.xp + xp
+      });
+    }
   };
 
   const handleTabChange = (tab: string) => {
@@ -201,7 +167,7 @@ const AuthenticatedApp = () => {
       case 'classes': return <Classes classes={classes} addClass={addClass} updateClass={updateClass} deleteClass={deleteClass} />;
       case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} />;
       case 'reviews': return <Reviews reviews={pendingReviews} onMarkReviewed={handleMarkReviewed} manualReviews={manualReviews} />;
-      case 'exams': return <Exams exams={exams} setExams={setExams} />;
+      case 'exams': return <Exams exams={exams} addExam={addExam} deleteExam={deleteExam} addXP={handleAddXP} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
       case 'notebook': return <Notebook data={notebookData} onUpdate={updateNotebook} />;
@@ -209,9 +175,9 @@ const AuthenticatedApp = () => {
       case 'flashcards': return <Flashcards flashcards={flashcards} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} />;
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} addItem={addDreamItem} deleteItem={deleteDreamItem} />;
-      case 'editorial': return <Editorial editorialData={editorialData} setEditorialData={setEditorialData} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
-      case 'xo-burnout': return <XoBurnout burnoutData={burnoutData} setBurnoutData={setBurnoutData} />;
-      case 'exam-mode': return <ExamMode examModeData={examModeData} setExamModeData={setExamModeData} />;
+      case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
+      case 'xo-burnout': return <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
+      case 'exam-mode': return <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
     }
   };

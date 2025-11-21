@@ -17,10 +17,12 @@ import { getPerformanceColor } from '@/lib/utils';
 
 interface ExamsProps {
   exams: ExamLog[];
-  setExams: (exams: ExamLog[]) => void;
+  addExam: (exam: Omit<ExamLog, 'id'>) => Promise<void>;
+  deleteExam: (id: string) => Promise<void>;
+  addXP: (xp: number) => void;
 }
 
-export default function Exams({ exams, setExams }: ExamsProps) {
+export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps) {
   const [newExam, setNewExam] = useState<Partial<ExamLog>>({
     name: '',
     institution: '',
@@ -76,8 +78,7 @@ export default function Exams({ exams, setExams }: ExamsProps) {
     const calculatedTotal = areaDetails.reduce((sum, ad) => sum + ad.total, 0);
     const calculatedCorrect = areaDetails.reduce((sum, ad) => sum + ad.correct, 0);
 
-    const item: ExamLog = {
-      id: Date.now().toString(),
+    const item: Omit<ExamLog, 'id'> = {
       name: newExam.name,
       institution: newExam.institution || 'Não informado',
       date: newExam.date!,
@@ -87,7 +88,8 @@ export default function Exams({ exams, setExams }: ExamsProps) {
       areaDetails
     };
 
-    setExams([...exams, item]);
+    addExam(item);
+    addXP(100); // XP_REWARDS.EXAM
     
     const accuracy = calculatedTotal > 0 ? (calculatedCorrect / calculatedTotal) * 100 : 0;
     toast({
@@ -108,7 +110,7 @@ export default function Exams({ exams, setExams }: ExamsProps) {
   };
 
   const handleDelete = (id: string) => {
-    setExams(exams.filter(e => e.id !== id));
+    deleteExam(id);
     toast({
       title: "Prova removida",
       description: "O registro foi excluído.",

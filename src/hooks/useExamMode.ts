@@ -1,0 +1,92 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { ExamModeData, ExamSession } from '@/lib/types';
+
+export function useExamMode(userId: string | undefined) {
+  const [examModeData, setExamModeData] = useState<ExamModeData>({ sessions: [], mantra: '' });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchExamMode = async () => {
+      const { data, error } = await supabase
+        .from('exam_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('completed_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching exam sessions:', error);
+      } else {
+        const sessions: ExamSession[] = data.map(s => ({
+          id: s.id,
+          date: s.completed_at.split('T')[0],
+          config: s.config as any,
+          distractions: (s.distractions as any) || [],
+          emotions: (s.post_emotions as any) || undefined,
+          diary: s.diary_notes || undefined,
+          strategy: (s.emotional_state as any)?.strategy || undefined,
+          completed: true,
+          actualDuration: (s.config as any).totalTime || 0
+        }));
+        
+        // Get mantra from most recent session or default
+        const mantra = sessions[0]?.config?.mantra || '';
+        
+        setExamModeData({ sessions, mantra });
+      }
+      setLoading(false);
+    };
+
+    fetchExamMode();
+  }, [userId]);
+
+  const addSession = async (session: Omit<ExamSession, 'id'>) => {
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from('exam_sessions')
+      .insert({
+        user_id: userId,
+        completed_at: new Date(session.date).toISOString(),
+        config: session.config as any,
+        distractions: session.distractions as any,
+        post_emotions: session.emotions as any,
+        diary_notes: session.diary,
+        emotional_state: { strategy: session.strategy }
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding exam session:', error);
+    } else {
+      const newSession: ExamSession = {
+        id: data.id,
+        date: data.completed_at.split('T')[0],
+        config: data.config as any,
+        distractions: (data.distractions as any) || [],
+        emotions: (data.post_emotions as any) || undefined,
+        diary: data.diary_notes || undefined,
+        strategy: (data.emotional_state as any)?.strategy || undefined,
+        completed: true,
+        actualDuration: (data.config as any).totalTime || 0
+      };
+
+      setExamModeData(prev => ({
+        mantra: session.config.mantra || prev.mantra,
+        sessions: [newSession, ...prev.sessions]
+      }));
+    }
+  };
+
+  const updateMantra = (mantra: string) => {
+    setExamModeData(prev => ({ ...prev, mantra }));
+  };
+
+  return { examModeData, loading, addSession, updateMantra, setExamModeData };
+}
