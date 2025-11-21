@@ -34,7 +34,7 @@ export const XP_REWARDS = {
 };
 
 export const RPG_LEVELS = [
-  { level: 1, name: 'Interno', minXP: 0, emoji: '🔰' },
+  { level: 1, name: 'Interno', minXP: 0, emoji: '🩺' },
   { level: 2, name: 'R1 Focado', minXP: 500, emoji: '🩺' },
   { level: 3, name: 'R2 Experiente', minXP: 1500, emoji: '💉' },
   { level: 4, name: 'R3 Especialista', minXP: 3000, emoji: '🎓' },
