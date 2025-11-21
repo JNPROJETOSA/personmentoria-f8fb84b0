@@ -52,8 +52,8 @@ const AuthenticatedApp = () => {
   const { exams, addExam, deleteExam } = useExams(user?.id);
   const { reviews: manualReviews, addReview } = useReviews(user?.id);
   const { editorialData, updateTopicStatus, setEditorialData } = useEditorial(user?.id);
-  const { burnoutData, addCheckIn: addBurnoutCheckIn, setBurnoutData } = useBurnout(user?.id);
-  const { examModeData, addSession: addExamSession, updateMantra, setExamModeData } = useExamMode(user?.id);
+  const { burnoutData, addCheckIn: addBurnoutCheckIn, setBurnoutData, loading: burnoutLoading } = useBurnout(user?.id);
+  const { examModeData, addSession: addExamSession, updateMantra, setExamModeData, loading: examModeLoading } = useExamMode(user?.id);
 
   // UserProgress from profile
   const userProgress: UserProgress = {
@@ -176,8 +176,8 @@ const AuthenticatedApp = () => {
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} addItem={addDreamItem} deleteItem={deleteDreamItem} />;
       case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
-      case 'xo-burnout': return <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
-      case 'exam-mode': return <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
+      case 'xo-burnout': return burnoutLoading ? <div className="text-center py-8">Carregando...</div> : <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
+      case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
     }
   };

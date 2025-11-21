@@ -6,6 +6,13 @@ export function useExamMode(userId: string | undefined) {
   const [examModeData, setExamModeData] = useState<ExamModeData>({ sessions: [], mantra: '' });
   const [loading, setLoading] = useState(true);
 
+  // Ensure data is always defined
+  useEffect(() => {
+    if (!loading && !examModeData) {
+      setExamModeData({ sessions: [], mantra: '' });
+    }
+  }, [loading, examModeData]);
+
   useEffect(() => {
     if (!userId) {
       setLoading(false);

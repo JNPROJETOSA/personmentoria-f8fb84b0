@@ -6,6 +6,13 @@ export function useBurnout(userId: string | undefined) {
   const [burnoutData, setBurnoutData] = useState<BurnoutData>({ checkIns: [] });
   const [loading, setLoading] = useState(true);
 
+  // Ensure data is always defined
+  useEffect(() => {
+    if (!loading && !burnoutData) {
+      setBurnoutData({ checkIns: [] });
+    }
+  }, [loading, burnoutData]);
+
   useEffect(() => {
     if (!userId) {
       setLoading(false);
