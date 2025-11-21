@@ -6,7 +6,34 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board';
+
+export interface Flashcard {
+  id: string;
+  area: MedicalArea;
+  front: string;
+  back: string;
+  difficulty: 'easy' | 'medium' | 'hard' | null;
+  lastReviewed: string | null;
+  nextReview: string | null;
+  reviewCount: number;
+}
+
+export interface DreamBoardItem {
+  id: string;
+  type: 'image' | 'note';
+  content: string; // URL for image, text for note
+  title?: string;
+  createdAt: string;
+}
+
+export interface UserProgress {
+  xp: number;
+  level: number;
+  streak: number;
+  lastStudyDate: string | null;
+  totalActivities: number;
+}
 
 export interface ClassItem {
   id: string;
@@ -29,10 +56,16 @@ export interface ExerciseLog {
 export interface ExamLog {
   id: string;
   name: string;
+  institution: string;
   date: string;
   totalQuestions: number;
   correctAnswers: number;
   areas: MedicalArea[];
+  areaDetails?: {
+    area: MedicalArea;
+    correct: number;
+    total: number;
+  }[];
 }
 
 export interface ReviewItem {
