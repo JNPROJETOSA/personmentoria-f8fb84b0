@@ -192,7 +192,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
       case 'analysis': return <Analysis exercises={exercises} />;
       case 'classes': return <Classes classes={classes} setClasses={setClasses} />;
       case 'exercises': return <Exercises exercises={exercises} setExercises={setExercises} />;
-      case 'reviews': return <Reviews reviews={pendingReviews} onMarkReviewed={handleMarkReviewed} />;
+      case 'reviews': return <Reviews reviews={pendingReviews} onMarkReviewed={handleMarkReviewed} manualReviews={manualReviews} />;
       case 'exams': return <Exams exams={exams} setExams={setExams} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
