@@ -12,15 +12,16 @@ import { toast } from '@/hooks/use-toast';
 
 interface DreamBoardProps {
   items: DreamBoardItem[];
-  setItems: (items: DreamBoardItem[]) => void;
+  addItem: (item: Omit<DreamBoardItem, 'id'>) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
 }
 
-export default function DreamBoard({ items, setItems }: DreamBoardProps) {
+export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newImage, setNewImage] = useState({ url: '', title: '' });
   const [newNote, setNewNote] = useState({ content: '', title: '' });
 
-  const handleAddImage = () => {
+  const handleAddImage = async () => {
     if (!newImage.url.trim()) {
       toast({
         title: "URL obrigatória",
@@ -30,21 +31,19 @@ export default function DreamBoard({ items, setItems }: DreamBoardProps) {
       return;
     }
 
-    const item: DreamBoardItem = {
-      id: Date.now().toString(),
+    await addItem({
       type: 'image',
       content: newImage.url,
       title: newImage.title || 'Imagem',
       createdAt: new Date().toISOString()
-    };
+    });
 
-    setItems([...items, item]);
     setNewImage({ url: '', title: '' });
     setIsAdding(false);
     toast({ title: "Imagem adicionada ao mural!" });
   };
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!newNote.content.trim()) {
       toast({
         title: "Conteúdo obrigatório",
@@ -54,22 +53,20 @@ export default function DreamBoard({ items, setItems }: DreamBoardProps) {
       return;
     }
 
-    const item: DreamBoardItem = {
-      id: Date.now().toString(),
+    await addItem({
       type: 'note',
       content: newNote.content,
       title: newNote.title || 'Nota',
       createdAt: new Date().toISOString()
-    };
+    });
 
-    setItems([...items, item]);
     setNewNote({ content: '', title: '' });
     setIsAdding(false);
     toast({ title: "Nota adicionada ao mural!" });
   };
 
-  const handleDelete = (id: string) => {
-    setItems(items.filter(i => i.id !== id));
+  const handleDelete = async (id: string) => {
+    await deleteItem(id);
     toast({ title: "Item removido" });
   };
 
@@ -79,9 +76,12 @@ export default function DreamBoard({ items, setItems }: DreamBoardProps) {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Mural dos Sonhos</CardTitle>
-              <CardDescription>
-                Visualize seus objetivos e mantenha a motivação
+              <CardTitle className="flex items-center gap-2">
+                <StickyNote className="w-5 h-5 text-primary" />
+                Mural dos Sonhos
+              </CardTitle>
+              <CardDescription className="mt-2">
+                Visualize seus objetivos, inspire-se e mantenha o foco na aprovação
               </CardDescription>
             </div>
             <Dialog open={isAdding} onOpenChange={setIsAdding}>
@@ -91,7 +91,7 @@ export default function DreamBoard({ items, setItems }: DreamBoardProps) {
                   Adicionar
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Adicionar ao Mural</DialogTitle>
                 </DialogHeader>
@@ -103,52 +103,56 @@ export default function DreamBoard({ items, setItems }: DreamBoardProps) {
                     </TabsTrigger>
                     <TabsTrigger value="note">
                       <StickyNote className="w-4 h-4 mr-2" />
-                      Nota
+                      Post-it
                     </TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="image" className="space-y-4">
                     <div className="space-y-2">
-                      <Label>URL da Imagem</Label>
+                      <Label htmlFor="image-url">URL da Imagem</Label>
                       <Input
+                        id="image-url"
+                        placeholder="https://exemplo.com/imagem.jpg"
                         value={newImage.url}
                         onChange={(e) => setNewImage({ ...newImage, url: e.target.value })}
-                        placeholder="https://exemplo.com/imagem.jpg"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Título (opcional)</Label>
+                      <Label htmlFor="image-title">Título (opcional)</Label>
                       <Input
+                        id="image-title"
+                        placeholder="Meu objetivo"
                         value={newImage.title}
                         onChange={(e) => setNewImage({ ...newImage, title: e.target.value })}
-                        placeholder="Ex: Hospital dos Sonhos"
                       />
                     </div>
                     <Button onClick={handleAddImage} className="w-full">
                       Adicionar Imagem
                     </Button>
                   </TabsContent>
-                  
+
                   <TabsContent value="note" className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Título (opcional)</Label>
+                      <Label htmlFor="note-title">Título (opcional)</Label>
                       <Input
+                        id="note-title"
+                        placeholder="Lembrete"
                         value={newNote.title}
                         onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
-                        placeholder="Ex: Minha Motivação"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Conteúdo</Label>
+                      <Label htmlFor="note-content">Conteúdo</Label>
                       <Textarea
+                        id="note-content"
+                        placeholder="Escreva sua motivação ou lembrete aqui..."
                         value={newNote.content}
                         onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
-                        placeholder="Ex: Vou passar na residência e realizar meu sonho!"
-                        rows={5}
+                        rows={4}
                       />
                     </div>
                     <Button onClick={handleAddNote} className="w-full">
-                      Adicionar Nota
+                      Adicionar Post-it
                     </Button>
                   </TabsContent>
                 </Tabs>
@@ -158,52 +162,60 @@ export default function DreamBoard({ items, setItems }: DreamBoardProps) {
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Seu mural está vazio.</p>
-              <p className="text-sm mt-2">Adicione imagens inspiradoras e notas motivacionais!</p>
+            <div className="text-center py-16 text-muted-foreground">
+              <StickyNote className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p className="text-lg mb-2">Seu mural está vazio</p>
+              <p className="text-sm">Adicione imagens inspiradoras e lembretes motivacionais</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map(item => (
-                <Card key={item.id} className="overflow-hidden group relative">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleDelete(item.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                  
+              {items.map((item) => (
+                <Card key={item.id} className="relative group overflow-hidden">
                   {item.type === 'image' ? (
-                    <>
-                      <div className="aspect-video bg-muted relative overflow-hidden">
-                        <img
-                          src={item.content}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlbSBOw6NvIEVuY29udHJhZGE8L3RleHQ+PC9zdmc+';
-                          }}
-                        />
+                    <div className="aspect-video relative">
+                      <img
+                        src={item.content}
+                        alt={item.title || 'Imagem do mural'}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 flex gap-2">
+                        <a
+                          href={item.content}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 bg-background/80 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <CardHeader>
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          {item.title}
-                          <a href={item.content} target="_blank" rel="noopener noreferrer" className="ml-auto">
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </CardTitle>
-                      </CardHeader>
-                    </>
+                      {item.title && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                          <p className="text-white text-sm font-medium">{item.title}</p>
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <CardContent className="pt-6 min-h-[200px] bg-gradient-to-br from-primary/10 to-accent/10">
-                      <div className="space-y-2">
-                        {item.title && (
-                          <h3 className="font-semibold text-lg">{item.title}</h3>
-                        )}
-                        <p className="text-sm whitespace-pre-wrap">{item.content}</p>
-                      </div>
+                    <CardContent className="pt-6 pb-4 bg-gradient-to-br from-yellow-100 to-yellow-200 dark:from-yellow-900/30 dark:to-yellow-800/30 min-h-[200px] relative">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                      {item.title && (
+                        <h4 className="font-semibold mb-2 text-yellow-900 dark:text-yellow-100">{item.title}</h4>
+                      )}
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200 whitespace-pre-wrap">{item.content}</p>
                     </CardContent>
                   )}
                 </Card>
