@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Edit, RotateCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ interface FlashcardsProps {
 }
 
 export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }: FlashcardsProps) {
+  const isMountedRef = useRef(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isStudying, setIsStudying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -29,17 +30,25 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
     back: ''
   });
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const filteredCards = filterArea === 'all' 
     ? flashcards 
     : flashcards.filter(c => c.area === filterArea);
 
   const handleCreate = async () => {
     if (!newCard.front.trim() || !newCard.back.trim()) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha a frente e o verso do card",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha a frente e o verso do card",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -48,6 +57,8 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
       front: newCard.front,
       back: newCard.back,
     });
+
+    if (!isMountedRef.current) return;
 
     setNewCard({ area: MedicalArea.PEDIATRIA, front: '', back: '' });
     setIsCreating(false);
@@ -60,7 +71,9 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
 
   const handleDelete = async (id: string) => {
     await deleteFlashcard(id);
-    toast({ title: "Card excluído" });
+    if (isMountedRef.current) {
+      toast({ title: "Card excluído" });
+    }
   };
 
   const handleDifficultySelect = (difficulty: 'easy' | 'medium' | 'hard') => {

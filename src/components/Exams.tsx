@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, FileText, Download, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ interface ExamsProps {
 }
 
 export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps) {
+  const isMountedRef = useRef(true);
   const [newExam, setNewExam] = useState<Partial<ExamLog>>({
     name: '',
     institution: '',
@@ -37,6 +38,12 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
   const [isAddingNewInstitution, setIsAddingNewInstitution] = useState(false);
   const [customInstitution, setCustomInstitution] = useState('');
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleAreaToggle = (area: MedicalArea) => {
     const areas = newExam.areas || [];
@@ -60,11 +67,13 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
 
   const handleAdd = () => {
     if (!newExam.name?.trim()) {
-      toast({
-        title: "Campo obrigatório",
-        description: "Por favor, informe o nome da prova.",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, informe o nome da prova.",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -91,6 +100,8 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
     addExam(item);
     addXP(100); // XP_REWARDS.EXAM
     
+    if (!isMountedRef.current) return;
+
     const accuracy = calculatedTotal > 0 ? (calculatedCorrect / calculatedTotal) * 100 : 0;
     toast({
       title: "Prova registrada!",
@@ -111,10 +122,12 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
 
   const handleDelete = (id: string) => {
     deleteExam(id);
-    toast({
-      title: "Prova removida",
-      description: "O registro foi excluído.",
-    });
+    if (isMountedRef.current) {
+      toast({
+        title: "Prova removida",
+        description: "O registro foi excluído.",
+      });
+    }
   };
 
   const toggleExamExpansion = (id: string) => {
