@@ -12,6 +12,7 @@ import { AREA_COLORS, EXAM_INSTITUTIONS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { getPerformanceColor } from '@/lib/utils';
 
 interface ExamsProps {
@@ -129,31 +130,136 @@ export default function Exams({ exams, setExams }: ExamsProps) {
       const doc = new jsPDF();
       const accuracy = (exam.correctAnswers / exam.totalQuestions) * 100;
       
-      doc.setFontSize(20);
-      doc.text('Boletim de Desempenho', 20, 20);
+      // Colors
+      const perryTeal: [number, number, number] = [13, 148, 136];
+      const softGrey: [number, number, number] = [245, 247, 250];
+      const darkText: [number, number, number] = [51, 65, 85];
+      const indigoHeader: [number, number, number] = [79, 70, 229];
       
+      // Header - Perry Teal bar
+      doc.setFillColor(...perryTeal);
+      doc.rect(0, 0, 210, 25, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PERRYMED - Boletim de Desempenho', 105, 12, { align: 'center' });
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Certificado de Rendimento Individual', 105, 19, { align: 'center' });
+      
+      // Exam info section
+      doc.setTextColor(...darkText);
       doc.setFontSize(14);
-      doc.text(`Prova: ${exam.name}`, 20, 35);
-      doc.text(`Instituição: ${exam.institution}`, 20, 45);
-      doc.text(`Data: ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 20, 55);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${exam.name}`, 20, 38);
       
-      doc.setFontSize(16);
-      doc.text('Resultado Geral', 20, 70);
-      doc.setFontSize(12);
-      doc.text(`Total: ${exam.correctAnswers}/${exam.totalQuestions} (${accuracy.toFixed(1)}%)`, 20, 80);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Instituição: ${exam.institution}`, 20, 46);
+      doc.text(`Data: ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 20, 52);
       
-      if (exam.areaDetails && exam.areaDetails.length > 0) {
-        doc.setFontSize(16);
-        doc.text('Desempenho por Área', 20, 95);
+      // Executive Summary Card
+      doc.setFillColor(...softGrey);
+      doc.roundedRect(20, 60, 170, 28, 3, 3, 'F');
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('RESUMO EXECUTIVO', 105, 67, { align: 'center' });
+      
+      const kpiX = [45, 105, 165];
+      const kpiLabels = ['Questões Totais', 'Acertos', 'Aproveitamento'];
+      const kpiValues = [
+        exam.totalQuestions.toString(),
+        exam.correctAnswers.toString(),
+        `${accuracy.toFixed(1)}%`
+      ];
+      
+      kpiLabels.forEach((label, idx) => {
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(label, kpiX[idx], 75, { align: 'center' });
         
-        let yPos = 105;
-        exam.areaDetails.forEach(ad => {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        
+        if (idx === 2) {
+          // Color-code the accuracy
+          if (accuracy >= 80) {
+            doc.setTextColor(16, 185, 129); // Emerald
+          } else if (accuracy >= 60) {
+            doc.setTextColor(245, 158, 11); // Amber
+          } else {
+            doc.setTextColor(239, 68, 68); // Red
+          }
+        } else {
+          doc.setTextColor(...darkText);
+        }
+        
+        doc.text(kpiValues[idx], kpiX[idx], 84, { align: 'center' });
+      });
+      
+      doc.setFont('helvetica', 'normal');
+      
+      // Performance by Area table
+      if (exam.areaDetails && exam.areaDetails.length > 0) {
+        doc.setTextColor(...darkText);
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Desempenho Detalhado por Área Médica', 20, 100);
+        
+        const tableData = exam.areaDetails.map(ad => {
           const areaAccuracy = ad.total > 0 ? (ad.correct / ad.total) * 100 : 0;
-          doc.setFontSize(12);
-          doc.text(`${ad.area}:`, 25, yPos);
-          doc.text(`${ad.correct}/${ad.total} (${areaAccuracy.toFixed(1)}%)`, 25, yPos + 7);
-          yPos += 15;
+          return [
+            ad.area,
+            ad.total.toString(),
+            ad.correct.toString(),
+            `${areaAccuracy.toFixed(1)}%`
+          ];
         });
+        
+        autoTable(doc, {
+          startY: 105,
+          head: [['Área Médica', 'Questões', 'Acertos', 'Nota (%)']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: {
+            fillColor: indigoHeader,
+            textColor: [255, 255, 255] as [number, number, number],
+            fontSize: 11,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          bodyStyles: {
+            fontSize: 10,
+            textColor: darkText
+          },
+          columnStyles: {
+            0: { cellWidth: 70, halign: 'left' },
+            1: { cellWidth: 40, halign: 'center' },
+            2: { cellWidth: 40, halign: 'center' },
+            3: { cellWidth: 40, halign: 'center', fontStyle: 'bold' }
+          },
+          alternateRowStyles: {
+            fillColor: [249, 250, 251] as [number, number, number]
+          },
+          margin: { left: 20, right: 20 }
+        });
+      }
+      
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Gerado em ${new Date().toLocaleString('pt-BR')} via PERRYMED - Página ${i} de ${pageCount}`,
+          105,
+          285,
+          { align: 'center' }
+        );
       }
       
       doc.save(`boletim-${exam.name.toLowerCase().replace(/\s/g, '-')}.pdf`);
