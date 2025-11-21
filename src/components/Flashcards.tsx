@@ -12,10 +12,11 @@ import { toast } from '@/hooks/use-toast';
 
 interface FlashcardsProps {
   flashcards: Flashcard[];
-  setFlashcards: (flashcards: Flashcard[]) => void;
+  addFlashcard: (flashcard: Omit<Flashcard, 'id' | 'difficulty' | 'lastReviewed' | 'nextReview' | 'reviewCount'>) => Promise<void>;
+  deleteFlashcard: (id: string) => Promise<void>;
 }
 
-export default function Flashcards({ flashcards, setFlashcards }: FlashcardsProps) {
+export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }: FlashcardsProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [isStudying, setIsStudying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -32,7 +33,7 @@ export default function Flashcards({ flashcards, setFlashcards }: FlashcardsProp
     ? flashcards 
     : flashcards.filter(c => c.area === filterArea);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!newCard.front.trim() || !newCard.back.trim()) {
       toast({
         title: "Campos obrigatórios",
@@ -42,18 +43,12 @@ export default function Flashcards({ flashcards, setFlashcards }: FlashcardsProp
       return;
     }
 
-    const card: Flashcard = {
-      id: Date.now().toString(),
+    await addFlashcard({
       area: newCard.area,
       front: newCard.front,
       back: newCard.back,
-      difficulty: null,
-      lastReviewed: null,
-      nextReview: null,
-      reviewCount: 0
-    };
+    });
 
-    setFlashcards([...flashcards, card]);
     setNewCard({ area: MedicalArea.PEDIATRIA, front: '', back: '' });
     setIsCreating(false);
     
@@ -63,25 +58,14 @@ export default function Flashcards({ flashcards, setFlashcards }: FlashcardsProp
     });
   };
 
+  const handleDelete = async (id: string) => {
+    await deleteFlashcard(id);
+    toast({ title: "Card excluído" });
+  };
+
   const handleDifficultySelect = (difficulty: 'easy' | 'medium' | 'hard') => {
-    const card = filteredCards[currentIndex];
-    const intervals = { easy: 7, medium: 3, hard: 1 };
-    const nextReview = new Date();
-    nextReview.setDate(nextReview.getDate() + intervals[difficulty]);
-
-    const updated = flashcards.map(c =>
-      c.id === card.id
-        ? {
-            ...c,
-            difficulty,
-            lastReviewed: new Date().toISOString().split('T')[0],
-            nextReview: nextReview.toISOString().split('T')[0],
-            reviewCount: c.reviewCount + 1
-          }
-        : c
-    );
-
-    setFlashcards(updated);
+    // TODO: Implement difficulty tracking in database
+    // For now, just move to next card
     setIsFlipped(false);
     
     if (currentIndex < filteredCards.length - 1) {
@@ -94,11 +78,6 @@ export default function Flashcards({ flashcards, setFlashcards }: FlashcardsProp
         description: `Você revisou ${filteredCards.length} cards`
       });
     }
-  };
-
-  const handleDelete = (id: string) => {
-    setFlashcards(flashcards.filter(c => c.id !== id));
-    toast({ title: "Card excluído" });
   };
 
   if (isStudying && filteredCards.length > 0) {

@@ -12,10 +12,12 @@ import { toast } from '@/hooks/use-toast';
 
 interface ClassesProps {
   classes: ClassItem[];
-  setClasses: (classes: ClassItem[]) => void;
+  addClass: (classItem: Omit<ClassItem, 'id'>) => Promise<void>;
+  updateClass: (id: string, updates: Partial<ClassItem>) => Promise<void>;
+  deleteClass: (id: string) => Promise<void>;
 }
 
-export default function Classes({ classes, setClasses }: ClassesProps) {
+export default function Classes({ classes, addClass, updateClass, deleteClass }: ClassesProps) {
   const [newClass, setNewClass] = useState<Partial<ClassItem>>({
     title: '',
     area: MedicalArea.CLINICA,
@@ -24,7 +26,7 @@ export default function Classes({ classes, setClasses }: ClassesProps) {
     priority: 2
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newClass.title?.trim()) {
       toast({
         title: "Campo obrigatório",
@@ -34,8 +36,7 @@ export default function Classes({ classes, setClasses }: ClassesProps) {
       return;
     }
 
-    const item: ClassItem = {
-      id: Date.now().toString(),
+    const item: Omit<ClassItem, 'id'> = {
       title: newClass.title,
       area: newClass.area!,
       date: newClass.date!,
@@ -43,7 +44,8 @@ export default function Classes({ classes, setClasses }: ClassesProps) {
       priority: newClass.priority as 1 | 2 | 3
     };
 
-    setClasses([...classes, item]);
+    await addClass(item);
+    
     setNewClass({
       title: '',
       area: MedicalArea.CLINICA,
@@ -58,12 +60,15 @@ export default function Classes({ classes, setClasses }: ClassesProps) {
     });
   };
 
-  const handleToggle = (id: string) => {
-    setClasses(classes.map(c => c.id === id ? { ...c, studied: !c.studied } : c));
+  const handleToggle = async (id: string) => {
+    const classItem = classes.find(c => c.id === id);
+    if (classItem) {
+      await updateClass(id, { studied: !classItem.studied });
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setClasses(classes.filter(c => c.id !== id));
+  const handleDelete = async (id: string) => {
+    await deleteClass(id);
     toast({
       title: "Aula removida",
       description: "A aula foi excluída com sucesso.",
