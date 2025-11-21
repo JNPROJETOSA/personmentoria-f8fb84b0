@@ -15,7 +15,7 @@ import BancaAnalysis from '@/components/BancaAnalysis';
 import DreamBoard from '@/components/DreamBoard';
 import Login from '@/components/Login';
 import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, User, UserProgress, Flashcard, DreamBoardItem } from '@/lib/types';
-import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS } from '@/lib/constants';
+import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
 
@@ -93,10 +93,10 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
     const today = new Date().toISOString().split('T')[0];
     const totalActivities = exercises.length + exams.length + classes.filter(c => c.studied).length;
     
-    // Calculate XP: 5 XP per question answered, 10 XP per class, 20 XP per exam
-    const exerciseXP = exercises.reduce((sum, ex) => sum + ex.totalQuestions * 5, 0);
-    const classXP = classes.filter(c => c.studied).length * 10;
-    const examXP = exams.length * 20;
+    // Calculate XP using RPG system rewards
+    const exerciseXP = exercises.length * XP_REWARDS.EXERCISE;
+    const classXP = classes.filter(c => c.studied).length * XP_REWARDS.CLASS;
+    const examXP = exams.length * XP_REWARDS.EXAM;
     const totalXP = exerciseXP + classXP + examXP;
 
     // Update streak
