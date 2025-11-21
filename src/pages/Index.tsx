@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart } from 'lucide-react';
+import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText } from 'lucide-react';
 import Dashboard from '@/components/Dashboard';
 import Analysis from '@/components/Analysis';
 import Classes from '@/components/Classes';
@@ -13,9 +13,10 @@ import Pomodoro from '@/components/Pomodoro';
 import Flashcards from '@/components/Flashcards';
 import BancaAnalysis from '@/components/BancaAnalysis';
 import DreamBoard from '@/components/DreamBoard';
+import Editorial from '@/components/Editorial';
 import Login from '@/components/Login';
-import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, User, UserProgress, Flashcard, DreamBoardItem } from '@/lib/types';
-import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS } from '@/lib/constants';
+import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, User, UserProgress, Flashcard, DreamBoardItem, EditorialData } from '@/lib/types';
+import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
 
@@ -88,6 +89,11 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [editorialData, setEditorialData] = useState<EditorialData>(() => {
+    const saved = localStorage.getItem(storagePrefix + 'editorial');
+    return saved ? JSON.parse(saved) : EDITORIAL_TEMPLATE;
+  });
+
   // Update XP and streak when exercises, exams, or classes change
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -135,6 +141,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
   useEffect(() => { localStorage.setItem(storagePrefix + 'user_progress', JSON.stringify(userProgress)); }, [userProgress]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'flashcards', JSON.stringify(flashcards)); }, [flashcards]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'dream_board', JSON.stringify(dreamBoardItems)); }, [dreamBoardItems]);
+  useEffect(() => { localStorage.setItem(storagePrefix + 'editorial', JSON.stringify(editorialData)); }, [editorialData]);
 
   const handleMarkReviewed = (topic: string) => {
     const log: ManualReviewLog = {
@@ -186,6 +193,17 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
     });
   }, [exercises, manualReviews, classes]);
 
+  const handleAddXP = (xp: number) => {
+    setUserProgress(prev => ({
+      ...prev,
+      xp: prev.xp + xp
+    }));
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab as TabType);
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={setGoals} userProgress={userProgress} />;
@@ -201,6 +219,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
       case 'flashcards': return <Flashcards flashcards={flashcards} setFlashcards={setFlashcards} />;
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} setItems={setDreamBoardItems} />;
+      case 'editorial': return <Editorial editorialData={editorialData} setEditorialData={setEditorialData} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={setGoals} userProgress={userProgress} />;
     }
   };
@@ -238,6 +257,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
+          <NavItem id="editorial" label="Edital" icon={ScrollText} />
           <NavItem id="notebook" label="Caderno de Erros" icon={Book} />
           <NavItem id="analysis" label="Análise Geral" icon={PieChart} />
           <NavItem id="classes" label="Aulas" icon={BookOpen} />
