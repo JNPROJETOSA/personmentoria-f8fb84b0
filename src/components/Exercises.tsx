@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, PenTool } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ interface ExercisesProps {
 }
 
 export default function Exercises({ exercises, addExercise, deleteExercise }: ExercisesProps) {
+  const isMountedRef = useRef(true);
   const [newExercise, setNewExercise] = useState<Partial<ExerciseLog>>({
     date: new Date().toISOString().split('T')[0],
     area: MedicalArea.CLINICA,
@@ -25,31 +26,43 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
     correctAnswers: 0
   });
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const handleAdd = async () => {
     if (!newExercise.topic?.trim()) {
-      toast({
-        title: "Campo obrigatório",
-        description: "Por favor, informe o tópico estudado.",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, informe o tópico estudado.",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
     if (!newExercise.totalQuestions || newExercise.totalQuestions < 1) {
-      toast({
-        title: "Quantidade inválida",
-        description: "Informe o número de questões realizadas.",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Quantidade inválida",
+          description: "Informe o número de questões realizadas.",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
     if (newExercise.correctAnswers! > newExercise.totalQuestions!) {
-      toast({
-        title: "Valor inconsistente",
-        description: "Acertos não podem ser maiores que o total de questões.",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Valor inconsistente",
+          description: "Acertos não podem ser maiores que o total de questões.",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -63,6 +76,8 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
 
     await addExercise(item);
     
+    if (!isMountedRef.current) return;
+
     const accuracy = (item.correctAnswers / item.totalQuestions) * 100;
     toast({
       title: "Exercício registrado!",
@@ -80,10 +95,12 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
 
   const handleDelete = async (id: string) => {
     await deleteExercise(id);
-    toast({
-      title: "Exercício removido",
-      description: "O registro foi excluído.",
-    });
+    if (isMountedRef.current) {
+      toast({
+        title: "Exercício removido",
+        description: "O registro foi excluído.",
+      });
+    }
   };
 
   const sortedExercises = [...exercises].sort((a, b) => {

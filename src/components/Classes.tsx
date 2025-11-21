@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ interface ClassesProps {
 }
 
 export default function Classes({ classes, addClass, updateClass, deleteClass }: ClassesProps) {
+  const isMountedRef = useRef(true);
   const [newClass, setNewClass] = useState<Partial<ClassItem>>({
     title: '',
     area: MedicalArea.CLINICA,
@@ -26,13 +27,21 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     priority: 2
   });
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const handleAdd = async () => {
     if (!newClass.title?.trim()) {
-      toast({
-        title: "Campo obrigatório",
-        description: "Por favor, preencha o título da aula.",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Campo obrigatório",
+          description: "Por favor, preencha o título da aula.",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -46,6 +55,8 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
 
     await addClass(item);
     
+    if (!isMountedRef.current) return;
+
     setNewClass({
       title: '',
       area: MedicalArea.CLINICA,
@@ -69,10 +80,12 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
 
   const handleDelete = async (id: string) => {
     await deleteClass(id);
-    toast({
-      title: "Aula removida",
-      description: "A aula foi excluída com sucesso.",
-    });
+    if (isMountedRef.current) {
+      toast({
+        title: "Aula removida",
+        description: "A aula foi excluída com sucesso.",
+      });
+    }
   };
 
   const sortedClasses = [...classes].sort((a, b) => {

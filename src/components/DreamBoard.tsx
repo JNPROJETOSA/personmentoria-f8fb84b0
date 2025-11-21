@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Image as ImageIcon, StickyNote, Trash2, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,17 +17,26 @@ interface DreamBoardProps {
 }
 
 export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardProps) {
+  const isMountedRef = useRef(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newImage, setNewImage] = useState({ url: '', title: '' });
   const [newNote, setNewNote] = useState({ content: '', title: '' });
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const handleAddImage = async () => {
     if (!newImage.url.trim()) {
-      toast({
-        title: "URL obrigatória",
-        description: "Insira a URL da imagem",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "URL obrigatória",
+          description: "Insira a URL da imagem",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -38,6 +47,8 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
       createdAt: new Date().toISOString()
     });
 
+    if (!isMountedRef.current) return;
+
     setNewImage({ url: '', title: '' });
     setIsAdding(false);
     toast({ title: "Imagem adicionada ao mural!" });
@@ -45,11 +56,13 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
 
   const handleAddNote = async () => {
     if (!newNote.content.trim()) {
-      toast({
-        title: "Conteúdo obrigatório",
-        description: "Escreva algo na nota",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Conteúdo obrigatório",
+          description: "Escreva algo na nota",
+          variant: "destructive"
+        });
+      }
       return;
     }
 
@@ -60,6 +73,8 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
       createdAt: new Date().toISOString()
     });
 
+    if (!isMountedRef.current) return;
+
     setNewNote({ content: '', title: '' });
     setIsAdding(false);
     toast({ title: "Nota adicionada ao mural!" });
@@ -67,7 +82,9 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
 
   const handleDelete = async (id: string) => {
     await deleteItem(id);
-    toast({ title: "Item removido" });
+    if (isMountedRef.current) {
+      toast({ title: "Item removido" });
+    }
   };
 
   return (
