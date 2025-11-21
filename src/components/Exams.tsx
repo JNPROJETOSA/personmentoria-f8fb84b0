@@ -17,10 +17,12 @@ interface ExamsProps {
 export default function Exams({ exams, setExams }: ExamsProps) {
   const [newExam, setNewExam] = useState<Partial<ExamLog>>({
     name: '',
+    institution: '',
     date: new Date().toISOString().split('T')[0],
     totalQuestions: 0,
     correctAnswers: 0,
-    areas: []
+    areas: [],
+    areaDetails: []
   });
 
   const handleAreaToggle = (area: MedicalArea) => {
@@ -63,10 +65,12 @@ export default function Exams({ exams, setExams }: ExamsProps) {
     const item: ExamLog = {
       id: Date.now().toString(),
       name: newExam.name,
+      institution: newExam.institution || 'Não informado',
       date: newExam.date!,
       totalQuestions: newExam.totalQuestions,
       correctAnswers: newExam.correctAnswers!,
-      areas: newExam.areas!
+      areas: newExam.areas!,
+      areaDetails: newExam.areaDetails
     };
 
     setExams([...exams, item]);
@@ -79,10 +83,12 @@ export default function Exams({ exams, setExams }: ExamsProps) {
 
     setNewExam({
       name: '',
+      institution: '',
       date: new Date().toISOString().split('T')[0],
       totalQuestions: 0,
       correctAnswers: 0,
-      areas: []
+      areas: [],
+      areaDetails: []
     });
   };
 
@@ -118,6 +124,16 @@ export default function Exams({ exams, setExams }: ExamsProps) {
                 placeholder="Ex: USP 2023"
                 value={newExam.name}
                 onChange={(e) => setNewExam({ ...newExam, name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="institution">Instituição/Banca</Label>
+              <Input
+                id="institution"
+                placeholder="Ex: USP, SUS-SP, ENARE"
+                value={newExam.institution}
+                onChange={(e) => setNewExam({ ...newExam, institution: e.target.value })}
               />
             </div>
 
