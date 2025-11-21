@@ -98,12 +98,6 @@ export interface Goals {
   targetTopicsPerWeek: number;
 }
 
-export interface User {
-  email: string;
-  name: string;
-  password: string;
-}
-
 export enum TopicStatus {
   NOT_STARTED = 'not-started',
   THEORY_SEEN = 'theory-seen',
