@@ -58,11 +58,26 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
         medical: {
-          pediatria: "hsl(var(--pediatria))",
-          go: "hsl(var(--go))",
-          preventiva: "hsl(var(--preventiva))",
-          clinica: "hsl(var(--clinica))",
-          cirurgia: "hsl(var(--cirurgia))",
+          pediatria: "hsl(var(--medical-pediatria))",
+          go: "hsl(var(--medical-go))",
+          preventiva: "hsl(var(--medical-preventiva))",
+          clinica: "hsl(var(--medical-clinica))",
+          cirurgia: "hsl(var(--medical-cirurgia))",
+        },
+        perry: {
+          teal: "#0d9488",
+          accent: "#f97316",
+        },
+        performance: {
+          success: "hsl(var(--success))",
+          warning: "hsl(var(--warning))",
+          danger: "hsl(var(--danger))",
+        },
+        heatmap: {
+          empty: "hsl(var(--heatmap-empty))",
+          low: "hsl(var(--heatmap-low))",
+          medium: "hsl(var(--heatmap-medium))",
+          high: "hsl(var(--heatmap-high))",
         },
         chart: {
           "1": "hsl(var(--chart-1))",
@@ -71,18 +86,34 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        slate: {
+          100: "#f1f5f9",
+          200: "#e2e8f0",
+          900: "#0f172a",
+          950: "#020617",
+        },
         teal: {
+          200: "#99f6e4",
           400: "#2dd4bf",
           500: "#14b8a6",
+          600: "#0d9488",
+        },
+        emerald: {
+          600: "#10b981",
+        },
+        amber: {
+          500: "#f59e0b",
+        },
+        red: {
+          100: "#fee2e2",
+          500: "#ef4444",
+          700: "#b91c1c",
         },
         blue: {
           500: "#3b82f6",
         },
         orange: {
           500: "#f97316",
-        },
-        red: {
-          500: "#ef4444",
         },
         purple: {
           500: "#a855f7",

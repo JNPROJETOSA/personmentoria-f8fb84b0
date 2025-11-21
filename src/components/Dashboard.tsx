@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { ExerciseLog, ClassItem, ReviewItem, Goals, UserProgress, MedicalArea } from '@/lib/types';
 import { AREA_COLORS, RPG_LEVELS } from '@/lib/constants';
+import { getPerformanceColor } from '@/lib/utils';
 
 interface DashboardProps {
   exercises: ExerciseLog[];
@@ -194,7 +195,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Progresso:</span>
-                <span className={weeklyQuestions >= goals.weeklyQuestions ? 'text-medical-preventiva font-semibold' : ''}>
+                <span className={weeklyQuestions >= goals.weeklyQuestions ? 'text-performance-success font-semibold' : ''}>
                   {weeklyQuestions}/{goals.weeklyQuestions}
                 </span>
               </div>
@@ -226,7 +227,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Progresso:</span>
-                <span className={uniqueTopics >= goals.targetTopicsPerWeek ? 'text-medical-preventiva font-semibold' : ''}>
+                <span className={uniqueTopics >= goals.targetTopicsPerWeek ? 'text-performance-success font-semibold' : ''}>
                   {uniqueTopics}/{goals.targetTopicsPerWeek}
                 </span>
               </div>
@@ -243,18 +244,23 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             <Activity className="w-5 h-5" />
             Mapa de Calor de Consistência
           </CardTitle>
-          <CardDescription>Últimos 6 meses de atividade</CardDescription>
+          <CardDescription>Últimos 6 meses - Quanto mais escuro, maior a intensidade</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <div className="inline-flex gap-1 flex-wrap" style={{ maxWidth: '100%' }}>
               {heatmapData.map((day, i) => {
-                const intensity = day.count === 0 ? 0 : Math.ceil((day.count / maxCount) * 4);
-                const colors = ['bg-muted', 'bg-primary/25', 'bg-primary/50', 'bg-primary/75', 'bg-primary'];
+                let color = 'bg-heatmap-empty';
+                if (day.count > 0) {
+                  if (day.count >= 50) color = 'bg-heatmap-high'; // Perry Teal
+                  else if (day.count >= 25) color = 'bg-heatmap-medium'; // Teal-400
+                  else if (day.count >= 10) color = 'bg-heatmap-low'; // Teal-200
+                  else color = 'bg-heatmap-low opacity-50';
+                }
                 return (
                   <div
                     key={i}
-                    className={`w-3 h-3 rounded-sm ${colors[intensity]} hover:ring-2 hover:ring-primary transition-all cursor-pointer`}
+                    className={`w-3 h-3 rounded-sm ${color} hover:ring-2 hover:ring-primary transition-all cursor-pointer`}
                     title={`${day.date}: ${day.count} questões`}
                   />
                 );
@@ -262,11 +268,11 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             </div>
             <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
               <span>Menos</span>
-              <div className="w-3 h-3 rounded-sm bg-muted" />
-              <div className="w-3 h-3 rounded-sm bg-primary/25" />
-              <div className="w-3 h-3 rounded-sm bg-primary/50" />
-              <div className="w-3 h-3 rounded-sm bg-primary/75" />
-              <div className="w-3 h-3 rounded-sm bg-primary" />
+              <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />
+              <div className="w-3 h-3 rounded-sm bg-heatmap-low opacity-50" />
+              <div className="w-3 h-3 rounded-sm bg-heatmap-low" />
+              <div className="w-3 h-3 rounded-sm bg-heatmap-medium" />
+              <div className="w-3 h-3 rounded-sm bg-heatmap-high" />
               <span>Mais</span>
             </div>
           </div>
@@ -275,12 +281,20 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
 
       {/* KPIs Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-medical-preventiva">
+        <Card className="border-l-4 border-l-performance-success">
           <CardHeader className="pb-3">
             <CardDescription>Progresso Global</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
+            <div className={`text-3xl font-bold ${
+              exercises.length > 0 
+                ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 80
+                  ? 'text-performance-success' 
+                  : ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 60
+                  ? 'text-performance-warning'
+                  : 'text-performance-danger'
+                : ''
+            }`}>
               {exercises.length > 0 
                 ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100).toFixed(1)
                 : 0}%
@@ -305,12 +319,12 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-destructive">
+        <Card className="border-l-4 border-l-performance-danger">
           <CardHeader className="pb-3">
             <CardDescription>Área de Atenção</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold">
+            <div className="text-lg font-bold text-performance-danger">
               {areaStats.length > 0 ? areaStats[areaStats.length - 1].area : '-'}
             </div>
             {areaStats.length > 0 && (
@@ -321,7 +335,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-medical-clinica">
+        <Card className="border-l-4 border-l-accent">
           <CardHeader className="pb-3">
             <CardDescription>Revisões Hoje</CardDescription>
           </CardHeader>

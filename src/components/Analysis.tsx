@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Download, TrendingUp, TrendingDown, Target } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import { getPerformanceColor } from '@/lib/utils';
 
 interface AnalysisProps {
   exercises: ExerciseLog[];
@@ -164,11 +165,7 @@ export default function Analysis({ exercises }: AnalysisProps) {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Taxa de Acerto</CardDescription>
-            <CardTitle className={`text-3xl ${
-              overallAccuracy >= 80 ? 'text-medical-preventiva' : 
-              overallAccuracy >= 60 ? 'text-medical-clinica' : 
-              'text-destructive'
-            }`}>
+            <CardTitle className={`text-3xl ${getPerformanceColor(overallAccuracy)}`}>
               {overallAccuracy.toFixed(1)}%
             </CardTitle>
           </CardHeader>
@@ -236,15 +233,15 @@ export default function Analysis({ exercises }: AnalysisProps) {
                 <Target className="w-5 h-5 text-primary" />
                 <span className="font-medium">Acertos</span>
               </div>
-              <span className="text-2xl font-bold text-medical-preventiva">{totalCorrect}</span>
+              <span className="text-2xl font-bold text-performance-success">{totalCorrect}</span>
             </div>
             
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
-                <TrendingDown className="w-5 h-5 text-destructive" />
+                <TrendingDown className="w-5 h-5 text-performance-danger" />
                 <span className="font-medium">Erros</span>
               </div>
-              <span className="text-2xl font-bold text-destructive">{totalQuestions - totalCorrect}</span>
+              <span className="text-2xl font-bold text-performance-danger">{totalQuestions - totalCorrect}</span>
             </div>
             
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
@@ -252,11 +249,7 @@ export default function Analysis({ exercises }: AnalysisProps) {
                 <TrendingUp className="w-5 h-5 text-primary" />
                 <span className="font-medium">Progresso</span>
               </div>
-              <span className={`text-2xl font-bold ${
-                overallAccuracy >= 80 ? 'text-medical-preventiva' : 
-                overallAccuracy >= 60 ? 'text-medical-clinica' : 
-                'text-destructive'
-              }`}>
+              <span className={`text-2xl font-bold ${getPerformanceColor(overallAccuracy)}`}>
                 {overallAccuracy.toFixed(1)}%
               </span>
             </div>
@@ -291,17 +284,13 @@ export default function Analysis({ exercises }: AnalysisProps) {
                       <td className="py-3 px-2 text-muted-foreground">{index + 1}</td>
                       <td className="py-3 px-4 font-medium">{topic.topic}</td>
                       <td className="text-center py-3 px-4">
-                        <span className={`font-bold ${
-                          topic.acurácia >= 80 ? 'text-medical-preventiva' : 
-                          topic.acurácia >= 60 ? 'text-medical-clinica' : 
-                          'text-destructive'
-                        }`}>
+                        <span className={`font-bold ${getPerformanceColor(topic.acurácia)}`}>
                           {topic.acurácia}%
                         </span>
                       </td>
                       <td className="text-center py-3 px-4">{topic.questões}</td>
-                      <td className="text-center py-3 px-4 text-medical-preventiva">{topic.acertos}</td>
-                      <td className="text-center py-3 px-4 text-destructive">{topic.erros}</td>
+                      <td className="text-center py-3 px-4 text-performance-success">{topic.acertos}</td>
+                      <td className="text-center py-3 px-4 text-performance-danger">{topic.erros}</td>
                       <td className="text-center py-3 px-4 text-sm text-muted-foreground">{topic.ultimaPratica}</td>
                     </tr>
                   ))}
