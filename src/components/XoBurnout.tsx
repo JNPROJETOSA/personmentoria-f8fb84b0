@@ -12,7 +12,7 @@ import { Heart, Smile, Battery, Moon, AlertTriangle, BookOpen, FileDown, Trendin
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface XoBurnoutProps {
   burnoutData: BurnoutData;
@@ -222,7 +222,7 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
         `${entry.mood}/5`
       ]);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         head: [['Data', 'Hora', 'Nível', 'Sentimento', 'Energia', 'Humor']],
         body: tableData,
         startY: 75,
