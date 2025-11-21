@@ -15,7 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
 
 interface ExamModeProps {
-  data: ExamModeData;
+  data?: ExamModeData;
   addSession: (session: Omit<ExamSession, 'id'>) => Promise<void>;
   updateMantra: (mantra: string) => void;
 }
@@ -29,7 +29,8 @@ const AMBIENT_SOUNDS: { value: AmbientSound; label: string }[] = [
   { value: 'auditorium', label: 'Auditório' }
 ];
 
-const ExamMode = ({ data: examModeData, addSession: addExamSession, updateMantra }: ExamModeProps) => {
+const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModeProps) => {
+  const examModeData: ExamModeData = data ?? { sessions: [], mantra: '' };
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
