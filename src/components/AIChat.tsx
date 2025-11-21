@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ExerciseLog, ClassItem } from '@/lib/types';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { useProfile } from '@/hooks/useProfile';
+import { useAuth } from '@/hooks/useAuth';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,30 +24,21 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Olá! Sou o Tutor PERRY, seu assistente de estudos para residência médica. Posso ajudá-lo com:\n\n• Explicações de conceitos médicos\n• Dicas de estudo e memorização\n• Análise do seu desempenho\n• Esclarecimento de dúvidas\n\nComo posso ajudá-lo hoje?'
+      content: 'Olá! Sou o **Tutor PERRY** 🎓, seu assistente de estudos para residência médica. \n\nPosso te ajudar com:\n- 📊 Análise do seu desempenho\n- 💡 Sugestões de estudo personalizadas\n- 📚 Dúvidas sobre temas médicos\n- 🎯 Estratégias de revisão\n\nComo posso te ajudar hoje?'
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
-
-  const generateContext = () => {
-    const totalQuestions = exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
-    const totalCorrect = exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
-    const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
-    
-    return `Contexto do estudante:
-- Total de questões: ${totalQuestions}
-- Acurácia geral: ${accuracy.toFixed(1)}%
-- Aulas assistidas: ${classes.filter(c => c.studied).length}/${classes.length}
-- Áreas praticadas: ${new Set(exercises.map(ex => ex.area)).size}`;
-  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -55,63 +49,113 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error('API key não configurada');
-      }
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Você é o Tutor PERRY, um assistente especializado em residência médica brasileira. Seja claro, objetivo e educativo.
-
-${generateContext()}
-
-Pergunta do estudante: ${input}`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao comunicar com a API');
-      }
-
-      const data = await response.json();
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: data.candidates[0].content.parts[0].text
+      // Prepare user data context
+      const userData = {
+        exercises,
+        classes,
+        profile,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-tutor`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [...messages, userMessage].map(m => ({
+              role: m.role,
+              content: m.content
+            })),
+            userData,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Rate limit excedido. Aguarde alguns instantes e tente novamente.');
+        }
+        if (response.status === 402) {
+          throw new Error('Créditos insuficientes. Adicione créditos ao workspace.');
+        }
+        throw new Error('Erro ao comunicar com Tutor PERRY');
+      }
+
+      if (!response.body) {
+        throw new Error('Resposta inválida do servidor');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = '';
+
+      // Create assistant message placeholder
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      let textBuffer = '';
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line.startsWith(':') || line.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  role: 'assistant',
+                  content: assistantContent
+                };
+                return updated;
+              });
+            }
+          } catch {
+            textBuffer = line + '\n' + textBuffer;
+            break;
+          }
+        }
+      }
+
     } catch (error) {
-      console.error('AI Error:', error);
+      console.error('Error:', error);
       toast({
-        title: "Erro ao processar",
-        description: "Não foi possível obter uma resposta. Verifique sua conexão e tente novamente.",
-        variant: "destructive"
+        title: 'Erro ao conversar com Tutor PERRY',
+        description: error instanceof Error ? error.message : 'Tente novamente em alguns instantes.',
+        variant: 'destructive',
       });
       
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.'
-      }]);
+      // Remove empty assistant message if error occurred
+      setMessages(prev => {
+        const updated = [...prev];
+        if (updated[updated.length - 1]?.content === '') {
+          updated.pop();
+        }
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +177,7 @@ Pergunta do estudante: ${input}`
             Tutor PERRY
           </CardTitle>
           <CardDescription>
-            Assistente inteligente especializado em residência médica
+            Assistente inteligente com IA especializado em residência médica
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col h-[calc(100%-8rem)]">
@@ -157,7 +201,13 @@ Pergunta do estudante: ${input}`
                         <span className="text-xs font-semibold">Tutor PERRY</span>
                       </div>
                     )}
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    {message.role === 'assistant' ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -167,7 +217,7 @@ Pergunta do estudante: ${input}`
                   <div className="max-w-[80%] rounded-lg p-4 bg-muted">
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Pensando...</span>
+                      <span className="text-sm">Analisando seus dados...</span>
                     </div>
                   </div>
                 </div>
@@ -209,30 +259,34 @@ Pergunta do estudante: ${input}`
             <Button
               variant="outline"
               className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Quais são as principais causas de dispneia em pediatria?')}
+              onClick={() => setInput('Analise meu desempenho geral e sugira áreas para focar')}
+              disabled={isLoading}
             >
-              Causas de dispneia em pediatria
+              📊 Análise do meu desempenho
             </Button>
             <Button
               variant="outline"
               className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Como memorizar os diagnósticos diferenciais de dor abdominal?')}
+              onClick={() => setInput('Quais tópicos devo revisar com base nas minhas notas?')}
+              disabled={isLoading}
             >
-              Dor abdominal - diagnósticos diferenciais
+              🎯 Sugestões de revisão
             </Button>
             <Button
               variant="outline"
               className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Me explique a fisiopatologia da pré-eclâmpsia')}
+              onClick={() => setInput('Me explique técnicas de memorização para residência médica')}
+              disabled={isLoading}
             >
-              Fisiopatologia da pré-eclâmpsia
+              🧠 Técnicas de estudo
             </Button>
             <Button
               variant="outline"
               className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Como posso melhorar minha acurácia nas questões?')}
+              onClick={() => setInput('Como organizar meu cronograma de estudos?')}
+              disabled={isLoading}
             >
-              Dicas para melhorar acurácia
+              📅 Organização de estudos
             </Button>
           </div>
         </CardContent>
