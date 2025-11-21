@@ -10,19 +10,22 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
-class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message?: string }
+> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, message: undefined };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: unknown) {
+    return { hasError: true, message: error instanceof Error ? error.message : String(error) };
   }
 
   componentDidCatch(error: unknown, errorInfo: unknown) {
-    // Logamos para ajudar a identificar erros específicos (principalmente no Chrome)
-    console.error('App crashed with error:', error, errorInfo);
+    // Log para ajudar a identificar erros específicos (principalmente no Chrome)
+    console.error("App crashed with error:", error, errorInfo);
   }
 
   render() {
@@ -34,9 +37,14 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
             <p className="text-muted-foreground">
               Detectamos um erro inesperado. Clique em "Recarregar" para tentar novamente.
             </p>
+            {this.state.message && (
+              <p className="text-xs text-muted-foreground break-words mt-2">
+                <span className="font-semibold">Detalhes técnicos:</span> {this.state.message}
+              </p>
+            )}
             <button
               onClick={() => window.location.reload()}
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors mt-4"
             >
               Recarregar
             </button>
