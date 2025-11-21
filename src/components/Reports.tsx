@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ExerciseLog, ClassItem, ExamLog, MedicalArea } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
 
 interface ReportsProps {
   exercises: ExerciseLog[];
@@ -49,24 +50,141 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
     const totalCorrect = filteredExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
     const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
 
-    // In a real implementation, you would generate a PDF here
-    // For now, we'll show the data in a toast
-    toast({
-      title: "Relatório gerado!",
-      description: `${totalQuestions} questões • ${accuracy.toFixed(1)}% acerto • ${filteredExercises.length} sessões`,
-    });
+    // Generate PDF
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      let yPosition = 20;
 
-    // Log report data for demonstration
-    console.log('Report Data:', {
-      period: { start: startDate, end: endDate },
-      exercises: filteredExercises,
-      exams: filteredExams,
-      summary: {
-        totalQuestions,
-        totalCorrect,
-        accuracy: accuracy.toFixed(1)
+      // Title
+      pdf.setFontSize(22);
+      pdf.setTextColor(66, 133, 244);
+      pdf.text('PERRYMED - Relatório de Desempenho', pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 15;
+      pdf.setFontSize(11);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(
+        `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`,
+        pageWidth / 2,
+        yPosition,
+        { align: 'center' }
+      );
+
+      // Summary section
+      yPosition += 20;
+      pdf.setFontSize(16);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('Resumo Geral', 14, yPosition);
+      
+      yPosition += 10;
+      pdf.setFontSize(11);
+      pdf.text(`Total de Questões: ${totalQuestions}`, 14, yPosition);
+      yPosition += 7;
+      pdf.text(`Acertos: ${totalCorrect}`, 14, yPosition);
+      yPosition += 7;
+      pdf.text(`Acurácia: ${accuracy.toFixed(1)}%`, 14, yPosition);
+      yPosition += 7;
+      pdf.text(`Sessões de Estudo: ${filteredExercises.length}`, 14, yPosition);
+
+      // Performance by area
+      yPosition += 15;
+      pdf.setFontSize(16);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('Desempenho por Área', 14, yPosition);
+      
+      const areaStats = Object.values(MedicalArea).map(area => {
+        const areaExercises = filteredExercises.filter(ex => ex.area === area);
+        const total = areaExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
+        const correct = areaExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
+        
+        return {
+          area,
+          total,
+          accuracy: total > 0 ? (correct / total) * 100 : 0
+        };
+      }).filter(a => a.total > 0);
+
+      yPosition += 10;
+      pdf.setFontSize(11);
+      areaStats.forEach(stat => {
+        if (yPosition > 270) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.text(`${stat.area}: ${stat.total} questões - ${stat.accuracy.toFixed(1)}% de acerto`, 14, yPosition);
+        yPosition += 7;
+      });
+
+      // Exercise sessions
+      if (filteredExercises.length > 0) {
+        yPosition += 10;
+        if (yPosition > 250) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFontSize(16);
+        pdf.text('Sessões de Estudo', 14, yPosition);
+        
+        yPosition += 10;
+        pdf.setFontSize(10);
+        filteredExercises.forEach(ex => {
+          if (yPosition > 270) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          const exAccuracy = (ex.correctAnswers / ex.totalQuestions) * 100;
+          pdf.text(
+            `${new Date(ex.date).toLocaleDateString('pt-BR')} - ${ex.area} - ${ex.topic}: ${ex.correctAnswers}/${ex.totalQuestions} (${exAccuracy.toFixed(0)}%)`,
+            14,
+            yPosition
+          );
+          yPosition += 6;
+        });
       }
-    });
+
+      // Exams
+      if (filteredExams.length > 0) {
+        yPosition += 10;
+        if (yPosition > 250) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFontSize(16);
+        pdf.text('Provas Antigas', 14, yPosition);
+        
+        yPosition += 10;
+        pdf.setFontSize(10);
+        filteredExams.forEach(exam => {
+          if (yPosition > 270) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          const examAccuracy = (exam.correctAnswers / exam.totalQuestions) * 100;
+          pdf.text(
+            `${new Date(exam.date).toLocaleDateString('pt-BR')} - ${exam.name}: ${exam.correctAnswers}/${exam.totalQuestions} (${examAccuracy.toFixed(0)}%)`,
+            14,
+            yPosition
+          );
+          yPosition += 6;
+        });
+      }
+
+      // Save PDF
+      pdf.save(`PERRYMED_Relatorio_${startDate}_a_${endDate}.pdf`);
+
+      toast({
+        title: "Relatório gerado com sucesso!",
+        description: `${totalQuestions} questões • ${accuracy.toFixed(1)}% acerto • ${filteredExercises.length} sessões`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro ao gerar relatório",
+        description: "Não foi possível gerar o PDF. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Calculate stats for preview
