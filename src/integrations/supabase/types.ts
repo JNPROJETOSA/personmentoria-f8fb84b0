@@ -14,7 +14,324 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      burnout_checkins: {
+        Row: {
+          created_at: string | null
+          date: string
+          energy: number
+          feeling: number
+          id: string
+          mood: number
+          notes: string | null
+          productivity: number
+          sleep: string
+          stress: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          energy: number
+          feeling: number
+          id?: string
+          mood: number
+          notes?: string | null
+          productivity: number
+          sleep: string
+          stress: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          energy?: number
+          feeling?: number
+          id?: string
+          mood?: number
+          notes?: string | null
+          productivity?: number
+          sleep?: string
+          stress?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      classes: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          priority: number
+          specialty: string
+          studied: boolean | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          priority: number
+          specialty: string
+          studied?: boolean | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          priority?: number
+          specialty?: string
+          studied?: boolean | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      dream_board_items: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exam_sessions: {
+        Row: {
+          completed_at: string
+          config: Json
+          created_at: string | null
+          diary_notes: string | null
+          distractions: Json | null
+          emotional_state: Json | null
+          id: string
+          post_emotions: Json | null
+          user_id: string
+        }
+        Insert: {
+          completed_at: string
+          config: Json
+          created_at?: string | null
+          diary_notes?: string | null
+          distractions?: Json | null
+          emotional_state?: Json | null
+          id?: string
+          post_emotions?: Json | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          config?: Json
+          created_at?: string | null
+          diary_notes?: string | null
+          distractions?: Json | null
+          emotional_state?: Json | null
+          id?: string
+          post_emotions?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exams: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          institution: string
+          name: string
+          performance: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          institution: string
+          name: string
+          performance: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          institution?: string
+          name?: string
+          performance?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exercises: {
+        Row: {
+          correct_answers: number
+          created_at: string | null
+          date: string
+          id: string
+          specialty: string
+          topic: string
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          correct_answers: number
+          created_at?: string | null
+          date: string
+          id?: string
+          specialty: string
+          topic: string
+          total_questions: number
+          user_id: string
+        }
+        Update: {
+          correct_answers?: number
+          created_at?: string | null
+          date?: string
+          id?: string
+          specialty?: string
+          topic?: string
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      flashcards: {
+        Row: {
+          area: string
+          back: string
+          created_at: string | null
+          front: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          area: string
+          back: string
+          created_at?: string | null
+          front: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          area?: string
+          back?: string
+          created_at?: string | null
+          front?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notebook_entries: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          specialty: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          specialty: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          specialty?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_study_date: string | null
+          level: number | null
+          name: string
+          streak: number | null
+          updated_at: string | null
+          user_id: string
+          xp: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_study_date?: string | null
+          level?: number | null
+          name: string
+          streak?: number | null
+          updated_at?: string | null
+          user_id: string
+          xp?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_study_date?: string | null
+          level?: number | null
+          name?: string
+          streak?: number | null
+          updated_at?: string | null
+          user_id?: string
+          xp?: number | null
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          completed: boolean | null
+          created_at: string | null
+          date: string
+          id: string
+          priority: number
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string | null
+          date: string
+          id?: string
+          priority: number
+          topic: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          priority?: number
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
