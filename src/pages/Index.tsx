@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile, Timer } from 'lucide-react';
 import Dashboard from '@/components/Dashboard';
 import Analysis from '@/components/Analysis';
@@ -16,18 +17,21 @@ import DreamBoard from '@/components/DreamBoard';
 import Editorial from '@/components/Editorial';
 import XoBurnout from '@/components/XoBurnout';
 import ExamMode from '@/components/ExamMode';
-import Login from '@/components/Login';
-import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, User, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
+import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
 import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 
-const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void }) => {
+const AuthenticatedApp = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
+  const { profile } = useProfile(user?.id);
   
-  const storagePrefix = `perry_${user.email}_`;
+  const storagePrefix = `perry_${user?.id}_`;
 
   const [classes, setClasses] = useState<ClassItem[]>(() => {
     const saved = localStorage.getItem(storagePrefix + 'classes');
@@ -303,7 +307,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
             {theme === 'dark' ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
             {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
           </Button>
-          <Button variant="outline" className="w-full" onClick={onLogout}>
+          <Button variant="outline" className="w-full" onClick={signOut}>
             <LogOut className="w-4 h-4 mr-2" />
             Sair
           </Button>
@@ -321,7 +325,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
           <div className="flex items-center gap-4">
             <div className="text-sm">
               <span className="text-muted-foreground">Bem-vindo,</span>{' '}
-              <span className="font-semibold">{user.name}</span>
+              <span className="font-semibold">{profile?.name || 'Estudante'}</span>
             </div>
           </div>
         </header>
@@ -335,24 +339,26 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
 };
 
 export default function Index() {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('perry_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
 
-  const handleLogin = (loggedUser: User) => {
-    setUser(loggedUser);
-    localStorage.setItem('perry_current_user', JSON.stringify(loggedUser));
-  };
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('perry_current_user');
-  };
-
-  if (!user) {
-    return <Login onLogin={handleLogin} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
-  return <AuthenticatedApp user={user} onLogout={handleLogout} />;
+  if (!user) {
+    return null;
+  }
+
+  return <AuthenticatedApp />;
 }
