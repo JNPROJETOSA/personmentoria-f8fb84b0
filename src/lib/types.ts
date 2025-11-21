@@ -6,7 +6,7 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout';
 
 export interface Flashcard {
   id: string;
@@ -131,4 +131,24 @@ export interface EditorialArea {
 
 export interface EditorialData {
   areas: EditorialArea[];
+}
+
+export type BurnoutLevel = 'green' | 'yellow' | 'red';
+
+export interface CheckInEntry {
+  id: string;
+  date: string;
+  time: string;
+  feeling: number; // 1-5
+  energy: number; // 1-5
+  mood: number; // 1-5
+  sleep: 'great' | 'ok' | 'bad';
+  stress: boolean;
+  studyPerformance: 'yes' | 'partially' | 'no';
+  notes?: string;
+  level: BurnoutLevel;
+}
+
+export interface BurnoutData {
+  checkIns: CheckInEntry[];
 }

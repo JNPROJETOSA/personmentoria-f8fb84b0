@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText } from 'lucide-react';
+import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile } from 'lucide-react';
 import Dashboard from '@/components/Dashboard';
 import Analysis from '@/components/Analysis';
 import Classes from '@/components/Classes';
@@ -14,8 +14,9 @@ import Flashcards from '@/components/Flashcards';
 import BancaAnalysis from '@/components/BancaAnalysis';
 import DreamBoard from '@/components/DreamBoard';
 import Editorial from '@/components/Editorial';
+import XoBurnout from '@/components/XoBurnout';
 import Login from '@/components/Login';
-import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, User, UserProgress, Flashcard, DreamBoardItem, EditorialData } from '@/lib/types';
+import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, User, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData } from '@/lib/types';
 import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
@@ -94,6 +95,11 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
     return saved ? JSON.parse(saved) : EDITORIAL_TEMPLATE;
   });
 
+  const [burnoutData, setBurnoutData] = useState<BurnoutData>(() => {
+    const saved = localStorage.getItem(storagePrefix + 'burnout');
+    return saved ? JSON.parse(saved) : { checkIns: [] };
+  });
+
   // Update XP and streak when exercises, exams, or classes change
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -142,6 +148,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
   useEffect(() => { localStorage.setItem(storagePrefix + 'flashcards', JSON.stringify(flashcards)); }, [flashcards]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'dream_board', JSON.stringify(dreamBoardItems)); }, [dreamBoardItems]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'editorial', JSON.stringify(editorialData)); }, [editorialData]);
+  useEffect(() => { localStorage.setItem(storagePrefix + 'burnout', JSON.stringify(burnoutData)); }, [burnoutData]);
 
   const handleMarkReviewed = (topic: string) => {
     const log: ManualReviewLog = {
@@ -220,6 +227,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} setItems={setDreamBoardItems} />;
       case 'editorial': return <Editorial editorialData={editorialData} setEditorialData={setEditorialData} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
+      case 'xo-burnout': return <XoBurnout burnoutData={burnoutData} setBurnoutData={setBurnoutData} />;
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={setGoals} userProgress={userProgress} />;
     }
   };
@@ -272,6 +280,7 @@ const AuthenticatedApp = ({ user, onLogout }: { user: User; onLogout: () => void
             <NavItem id="flashcards" label="Flashcards" icon={CreditCard} />
             <NavItem id="banca-analysis" label="Raio-X da Banca" icon={Trophy} />
             <NavItem id="dream-board" label="Mural dos Sonhos" icon={Heart} />
+            <NavItem id="xo-burnout" label="Xô Burnout" icon={Smile} />
           </div>
           
           <div className="my-4 border-t pt-4">
