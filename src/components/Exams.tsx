@@ -4,9 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ExamLog, MedicalArea } from '@/lib/types';
-import { AREA_COLORS } from '@/lib/constants';
+import { AREA_COLORS, EXAM_INSTITUTIONS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import jsPDF from 'jspdf';
@@ -30,6 +32,8 @@ export default function Exams({ exams, setExams }: ExamsProps) {
   
   const [areaInputs, setAreaInputs] = useState<Record<string, { correct: number; total: number }>>({});
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
+  const [isAddingNewInstitution, setIsAddingNewInstitution] = useState(false);
+  const [customInstitution, setCustomInstitution] = useState('');
 
   const handleAreaToggle = (area: MedicalArea) => {
     const areas = newExam.areas || [];
@@ -196,12 +200,73 @@ export default function Exams({ exams, setExams }: ExamsProps) {
 
             <div className="space-y-2">
               <Label htmlFor="institution">Instituição/Banca</Label>
-              <Input
-                id="institution"
-                placeholder="Ex: USP, SUS-SP, ENARE"
-                value={newExam.institution}
-                onChange={(e) => setNewExam({ ...newExam, institution: e.target.value })}
-              />
+              <Select 
+                value={newExam.institution} 
+                onValueChange={(value) => {
+                  if (value === 'CUSTOM') {
+                    setIsAddingNewInstitution(true);
+                    setNewExam({ ...newExam, institution: '' });
+                  } else {
+                    setIsAddingNewInstitution(false);
+                    setNewExam({ ...newExam, institution: value });
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a banca" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {EXAM_INSTITUTIONS.map(inst => (
+                    <SelectItem key={inst} value={inst}>{inst}</SelectItem>
+                  ))}
+                  <SelectItem value="CUSTOM">+ Cadastrar nova banca</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {isAddingNewInstitution && (
+                <Dialog open={isAddingNewInstitution} onOpenChange={setIsAddingNewInstitution}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Cadastrar Nova Banca</DialogTitle>
+                      <DialogDescription>
+                        Digite o nome da nova instituição/banca
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Input
+                        placeholder="Ex: Hospital das Clínicas"
+                        value={customInstitution}
+                        onChange={(e) => setCustomInstitution(e.target.value)}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={() => {
+                            if (customInstitution.trim()) {
+                              setNewExam({ ...newExam, institution: customInstitution.trim() });
+                              setIsAddingNewInstitution(false);
+                              setCustomInstitution('');
+                            }
+                          }}
+                          className="flex-1"
+                        >
+                          Confirmar
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setIsAddingNewInstitution(false);
+                            setCustomInstitution('');
+                          }}
+                          className="flex-1"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             <div className="space-y-2">

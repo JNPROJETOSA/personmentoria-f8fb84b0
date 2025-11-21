@@ -1,4 +1,4 @@
-import { Save, Book } from 'lucide-react';
+import { Save, Book, FileDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NotebookData, MedicalArea } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
 
 interface NotebookProps {
   data: NotebookData;
@@ -22,6 +23,99 @@ export default function Notebook({ data, setData }: NotebookProps) {
 
   const handleChange = (area: MedicalArea, value: string) => {
     setData({ ...data, [area]: value });
+  };
+
+  const generateNotebookPDF = () => {
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - (margin * 2);
+      
+      // Perry Teal header
+      const perryTeal: [number, number, number] = [13, 148, 136];
+      pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
+      pdf.rect(0, 0, pageWidth, 25, 'F');
+      
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('PERRYMED - Caderno de Erros', pageWidth / 2, 15, { align: 'center' });
+      
+      let yPosition = 40;
+      
+      // Add each area's notes
+      Object.values(MedicalArea).forEach((area) => {
+        const content = data[area];
+        if (!content || content.trim().length === 0) return;
+        
+        // Check if we need a new page
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        
+        // Area header with color
+        const rgb = AREA_COLORS[area].match(/\w\w/g)?.map(x => parseInt(x, 16)) as [number, number, number];
+        if (rgb) {
+          pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
+          pdf.roundedRect(margin, yPosition, maxWidth, 12, 2, 2, 'F');
+        }
+        
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(area, margin + 5, yPosition + 8);
+        
+        yPosition += 20;
+        
+        // Content
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(60, 60, 60);
+        
+        const lines = pdf.splitTextToSize(content, maxWidth);
+        lines.forEach((line: string) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          pdf.text(line, margin, yPosition);
+          yPosition += 6;
+        });
+        
+        yPosition += 10;
+      });
+      
+      // Footer on all pages
+      const pageCount = (pdf as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(
+          `Gerado em ${new Date().toLocaleString('pt-BR')} via PERRYMED - Página ${i} de ${pageCount}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+      }
+      
+      pdf.save(`PERRYMED_Caderno_de_Erros_${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      toast({
+        title: "PDF gerado com sucesso!",
+        description: "Seu caderno de erros foi exportado.",
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível exportar o caderno.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -84,10 +178,16 @@ Exemplos:
             ))}
           </Tabs>
 
-          <Button onClick={handleSave} className="w-full mt-6">
-            <Save className="w-4 h-4 mr-2" />
-            Salvar Anotações
-          </Button>
+          <div className="flex gap-3 mt-6">
+            <Button onClick={handleSave} className="flex-1">
+              <Save className="w-4 h-4 mr-2" />
+              Salvar Anotações
+            </Button>
+            <Button onClick={generateNotebookPDF} variant="outline" className="flex-1">
+              <FileDown className="w-4 h-4 mr-2" />
+              Exportar PDF
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

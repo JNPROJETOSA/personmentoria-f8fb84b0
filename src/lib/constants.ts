@@ -42,3 +42,19 @@ export const RPG_LEVELS = [
   { level: 6, name: 'Staff Respeitado', minXP: 8000, emoji: '' },
   { level: 7, name: 'Lenda da Medicina', minXP: 12000, emoji: '' },
 ];
+
+// Bancas/Instituições de Provas Médicas
+export const EXAM_INSTITUTIONS = [
+  'USP',
+  'UNIFESP',
+  'ENARE',
+  'SUS-SP',
+  'SUS-RJ',
+  'AMRIGS',
+  'IAMSPE',
+  'UNICAMP',
+  'UFMG',
+  'UFRJ',
+  'Revalida',
+  'Outra'
+] as const;
