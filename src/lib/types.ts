@@ -6,7 +6,7 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode';
 
 export interface Flashcard {
   id: string;
@@ -151,4 +151,50 @@ export interface CheckInEntry {
 
 export interface BurnoutData {
   checkIns: CheckInEntry[];
+}
+
+export type AmbientSound = 'silence' | 'exam-room' | 'white-noise' | 'rain' | 'library' | 'auditorium';
+
+export interface ExamPhase {
+  name: string;
+  duration: number; // minutes
+}
+
+export interface DistractionMark {
+  timestamp: number; // seconds from start
+  type: 'mental-pause' | 'distraction';
+}
+
+export interface ExamSessionConfig {
+  totalTime: number; // minutes
+  phases: ExamPhase[];
+  ambientSound: AmbientSound;
+  soundAlerts: boolean;
+  fullscreen: boolean;
+  resistanceMode: boolean;
+  mantra?: string;
+}
+
+export interface PostSessionEmotions {
+  anxiety: number; // 1-5
+  focus: number; // 1-5
+  mentalFatigue: number; // 1-5
+  overallFeeling: string;
+}
+
+export interface ExamSession {
+  id: string;
+  date: string;
+  config: ExamSessionConfig;
+  distractions: DistractionMark[];
+  emotions?: PostSessionEmotions;
+  diary?: string;
+  strategy?: string;
+  completed: boolean;
+  actualDuration: number; // minutes
+}
+
+export interface ExamModeData {
+  sessions: ExamSession[];
+  mantra: string;
 }
