@@ -15,11 +15,11 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface XoBurnoutProps {
-  burnoutData: BurnoutData;
-  setBurnoutData: (data: BurnoutData) => void;
+  data: BurnoutData;
+  addCheckIn: (checkIn: Omit<CheckInEntry, 'id' | 'level'>) => Promise<void>;
 }
 
-const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
+const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurnoutProps) => {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportDays, setReportDays] = useState('7');
@@ -61,12 +61,11 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
     return 'red';
   };
 
-  const handleSubmitCheckIn = () => {
+  const handleSubmitCheckIn = async () => {
     const level = calculateLevel(feeling, energy, mood, sleep, stress, studyPerformance);
     
     const now = new Date();
-    const checkIn: CheckInEntry = {
-      id: `checkin-${Date.now()}`,
+    const checkIn: Omit<CheckInEntry, 'id' | 'level'> = {
       date: now.toISOString().split('T')[0],
       time: now.toTimeString().split(' ')[0].substring(0, 5),
       feeling,
@@ -75,14 +74,10 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
       sleep,
       stress,
       studyPerformance,
-      notes: notes.trim() || undefined,
-      level
+      notes: notes.trim() || undefined
     };
 
-    setBurnoutData({
-      ...burnoutData,
-      checkIns: [checkIn, ...burnoutData.checkIns]
-    });
+    await addBurnoutCheckIn(checkIn);
 
     toast({
       title: "Check-in registrado",

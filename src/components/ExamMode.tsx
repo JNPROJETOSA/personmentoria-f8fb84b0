@@ -15,8 +15,9 @@ import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
 
 interface ExamModeProps {
-  examModeData: ExamModeData;
-  setExamModeData: (data: ExamModeData) => void;
+  data: ExamModeData;
+  addSession: (session: Omit<ExamSession, 'id'>) => Promise<void>;
+  updateMantra: (mantra: string) => void;
 }
 
 const AMBIENT_SOUNDS: { value: AmbientSound; label: string }[] = [
@@ -28,7 +29,7 @@ const AMBIENT_SOUNDS: { value: AmbientSound; label: string }[] = [
   { value: 'auditorium', label: 'Auditório' }
 ];
 
-const ExamMode = ({ examModeData, setExamModeData }: ExamModeProps) => {
+const ExamMode = ({ data: examModeData, addSession: addExamSession, updateMantra }: ExamModeProps) => {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -217,7 +218,7 @@ const ExamMode = ({ examModeData, setExamModeData }: ExamModeProps) => {
     });
   };
 
-  const savePostSession = () => {
+  const savePostSession = async () => {
     if (!currentSession) return;
     
     const emotions: PostSessionEmotions = {
@@ -227,16 +228,13 @@ const ExamMode = ({ examModeData, setExamModeData }: ExamModeProps) => {
       overallFeeling: overallFeeling.trim()
     };
     
-    const finalSession: ExamSession = {
+    const finalSession: Omit<ExamSession, 'id'> = {
       ...currentSession,
       emotions,
       diary: diary.trim() || undefined
     };
     
-    setExamModeData({
-      ...examModeData,
-      sessions: [finalSession, ...examModeData.sessions]
-    });
+    await addExamSession(finalSession);
     
     toast({
       title: "Sessão Salva",
@@ -521,8 +519,8 @@ const ExamMode = ({ examModeData, setExamModeData }: ExamModeProps) => {
                 <Label>Mantra Pessoal</Label>
                 <Input
                   placeholder="Ex: Eu sei resolver isso. Um passo por vez."
-                  value={examModeData.mantra}
-                  onChange={(e) => setExamModeData({ ...examModeData, mantra: e.target.value })}
+                  value={examModeData?.mantra || ''}
+                  onChange={(e) => updateMantra(e.target.value)}
                 />
               </div>
 
