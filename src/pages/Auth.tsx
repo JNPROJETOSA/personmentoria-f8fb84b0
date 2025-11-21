@@ -110,7 +110,7 @@ export default function Auth() {
                     <Input
                       id="name"
                       type="text"
-                      placeholder="Seu nome"
+                      placeholder="Nome completo"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="pl-10"
@@ -125,7 +125,7 @@ export default function Auth() {
                     <Input
                       id="inviteCode"
                       type="text"
-                      placeholder="Ex: PERRYMED2024"
+                      placeholder="Código de acesso"
                       value={inviteCode}
                       onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                       className="pl-10"
@@ -142,7 +142,7 @@ export default function Auth() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="seu@email.com"
+                  placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
@@ -157,7 +157,7 @@ export default function Auth() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="Senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
