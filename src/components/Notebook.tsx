@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Save, Book, FileDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,24 +15,74 @@ interface NotebookProps {
 }
 
 export default function Notebook({ data, onUpdate }: NotebookProps) {
+  const isMountedRef = useRef(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [localData, setLocalData] = useState(data);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Sync local state with prop changes
   useEffect(() => {
     setLocalData(data);
   }, [data]);
 
-  const handleChange = (area: MedicalArea, content: string) => {
-    setLocalData(prev => ({ ...prev, [area]: content }));
-    // Auto-save after debounce (could add debouncing here if needed)
-    onUpdate(area, content);
+  const saveAllChanges = async () => {
+    setIsSaving(true);
+    
+    // Save all areas with content
+    const savePromises = Object.entries(localData).map(([area, content]) => {
+      return onUpdate(area as MedicalArea, content);
+    });
+
+    try {
+      await Promise.all(savePromises);
+      
+      if (isMountedRef.current) {
+        setHasUnsavedChanges(false);
+        toast({
+          title: "Salvo com sucesso!",
+          description: "Suas anotações foram salvas na nuvem.",
+        });
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        toast({
+          title: "Erro ao salvar",
+          description: "Não foi possível salvar suas anotações. Tente novamente.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
+    }
   };
 
-  const handleSave = async () => {
-    toast({
-      title: "Salvo com sucesso!",
-      description: "Suas anotações foram atualizadas.",
-    });
+  const handleChange = (area: MedicalArea, content: string) => {
+    setLocalData(prev => ({ ...prev, [area]: content }));
+    setHasUnsavedChanges(true);
+
+    // Debounce auto-save (5 seconds)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      onUpdate(area, content);
+      if (isMountedRef.current) {
+        setHasUnsavedChanges(false);
+      }
+    }, 5000);
   };
 
   const generateNotebookPDF = () => {
@@ -120,11 +170,13 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
       });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast({
-        title: "Erro ao gerar PDF",
-        description: "Não foi possível exportar o caderno.",
-        variant: "destructive"
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Erro ao gerar PDF",
+          description: "Não foi possível exportar o caderno.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -137,7 +189,10 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
             Caderno de Erros e Anotações
           </CardTitle>
           <CardDescription>
-            Organize seus aprendizados por área médica. As anotações são salvas automaticamente na nuvem.
+            Organize seus aprendizados por área médica.
+            {hasUnsavedChanges && (
+              <span className="text-orange-500 font-semibold ml-2">• Alterações não salvas</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -189,7 +244,15 @@ Exemplos:
           </Tabs>
 
           <div className="flex gap-3 mt-6">
-            <Button onClick={generateNotebookPDF} variant="outline" className="w-full">
+            <Button 
+              onClick={saveAllChanges} 
+              disabled={!hasUnsavedChanges || isSaving}
+              className="flex-1"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? 'Salvando...' : hasUnsavedChanges ? 'Salvar Agora' : 'Tudo Salvo'}
+            </Button>
+            <Button onClick={generateNotebookPDF} variant="outline" className="flex-1">
               <FileDown className="w-4 h-4 mr-2" />
               Exportar PDF
             </Button>
