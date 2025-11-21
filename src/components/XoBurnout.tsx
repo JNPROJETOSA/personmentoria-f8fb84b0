@@ -184,8 +184,9 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
 
   const generatePDF = () => {
     const doc = new jsPDF();
-    const days = parseInt(reportDays);
-    const filteredData = burnoutData.checkIns.slice(0, days);
+    const filteredData = reportDays === 'all' 
+      ? burnoutData.checkIns 
+      : burnoutData.checkIns.slice(0, parseInt(reportDays));
 
     // Header
     doc.setFillColor(13, 148, 136);
@@ -196,7 +197,10 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
     
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
-    doc.text(`Período: Últimos ${days} dias`, 20, 35);
+    const periodText = reportDays === 'all' 
+      ? `Período: Desde o início (${filteredData.length} check-ins)` 
+      : `Período: Últimos ${reportDays} dias`;
+    doc.text(periodText, 20, 35);
     doc.text(`Data de geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, 40);
 
     // Summary
@@ -231,10 +235,50 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
       });
     }
 
-    // Recommendations
+    // Trends Analysis
     const finalY = (doc as any).lastAutoTable?.finalY || 75;
+    
+    // Calculate averages
+    const avgFeeling = (filteredData.reduce((sum, e) => sum + e.feeling, 0) / filteredData.length).toFixed(1);
+    const avgEnergy = (filteredData.reduce((sum, e) => sum + e.energy, 0) / filteredData.length).toFixed(1);
+    const avgMood = (filteredData.reduce((sum, e) => sum + e.mood, 0) / filteredData.length).toFixed(1);
+    
     doc.setFontSize(12);
-    doc.text('Sugestões Gerais de Autocuidado', 20, finalY + 15);
+    doc.text('Análise de Tendências', 20, finalY + 15);
+    
+    doc.setFontSize(10);
+    doc.text(`Média de Sentimento: ${avgFeeling}/5`, 25, finalY + 23);
+    doc.text(`Média de Energia: ${avgEnergy}/5`, 25, finalY + 29);
+    doc.text(`Média de Humor: ${avgMood}/5`, 25, finalY + 35);
+    
+    // Visual trend bars
+    const drawBar = (y: number, value: number, label: string, color: [number, number, number]) => {
+      doc.setFillColor(color[0], color[1], color[2]);
+      const barWidth = (value / 5) * 80;
+      doc.rect(25, y, barWidth, 4, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(25, y, 80, 4, 'S');
+    };
+    
+    drawBar(finalY + 43, parseFloat(avgFeeling), 'Sentimento', [59, 130, 246]); // Blue
+    drawBar(finalY + 50, parseFloat(avgEnergy), 'Energia', [16, 185, 129]); // Green
+    drawBar(finalY + 57, parseFloat(avgMood), 'Humor', [245, 158, 11]); // Orange
+    
+    // Sleep quality
+    const sleepStats = {
+      great: filteredData.filter(e => e.sleep === 'great').length,
+      ok: filteredData.filter(e => e.sleep === 'ok').length,
+      bad: filteredData.filter(e => e.sleep === 'bad').length
+    };
+    
+    doc.setFontSize(10);
+    doc.text('Qualidade do Sono:', 25, finalY + 67);
+    doc.setFontSize(9);
+    doc.text(`Ótimo: ${sleepStats.great} dias | Ok: ${sleepStats.ok} dias | Ruim: ${sleepStats.bad} dias`, 25, finalY + 73);
+    
+    // Recommendations
+    doc.setFontSize(12);
+    doc.text('Sugestões Gerais de Autocuidado', 20, finalY + 85);
     doc.setFontSize(9);
     const suggestions = [
       '• Mantenha uma rotina regular de sono',
@@ -244,10 +288,13 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
       '• Busque ajuda profissional se necessário'
     ];
     suggestions.forEach((sug, idx) => {
-      doc.text(sug, 25, finalY + 22 + (idx * 6));
+      doc.text(sug, 25, finalY + 92 + (idx * 6));
     });
 
-    doc.save(`relatorio-bem-estar-${days}dias.pdf`);
+    const fileName = reportDays === 'all' 
+      ? 'relatorio-bem-estar-completo.pdf' 
+      : `relatorio-bem-estar-${reportDays}dias.pdf`;
+    doc.save(fileName);
     
     toast({
       title: "Relatório gerado",
@@ -602,6 +649,7 @@ const XoBurnout = ({ burnoutData, setBurnoutData }: XoBurnoutProps) => {
                   <SelectItem value="7">Últimos 7 dias</SelectItem>
                   <SelectItem value="14">Últimos 14 dias</SelectItem>
                   <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="all">Desde o início</SelectItem>
                 </SelectContent>
               </Select>
             </div>
