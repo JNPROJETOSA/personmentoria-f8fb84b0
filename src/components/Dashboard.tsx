@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { ExerciseLog, ClassItem, ReviewItem, Goals, UserProgress, MedicalArea } from '@/lib/types';
-import { AREA_COLORS } from '@/lib/constants';
+import { AREA_COLORS, RPG_LEVELS } from '@/lib/constants';
 
 interface DashboardProps {
   exercises: ExerciseLog[];
@@ -17,27 +17,14 @@ interface DashboardProps {
   userProgress: UserProgress;
 }
 
-const LEVELS = [
-  { level: 1, name: 'Estudante Iniciante', minXP: 0 },
-  { level: 2, name: 'Estudante Dedicado', minXP: 100 },
-  { level: 3, name: 'Interno Focado', minXP: 300 },
-  { level: 4, name: 'R1 Determinado', minXP: 600 },
-  { level: 5, name: 'R2 Experiente', minXP: 1000 },
-  { level: 6, name: 'R3 Sênior', minXP: 1500 },
-  { level: 7, name: 'Chefe de Plantão', minXP: 2200 },
-  { level: 8, name: 'Preceptor', minXP: 3000 },
-  { level: 9, name: 'Especialista', minXP: 4000 },
-  { level: 10, name: 'Professor Titular', minXP: 5500 }
-];
-
 function getLevelInfo(xp: number) {
-  let currentLevel = LEVELS[0];
-  let nextLevel = LEVELS[1];
+  let currentLevel = RPG_LEVELS[0];
+  let nextLevel = RPG_LEVELS[1];
 
-  for (let i = 0; i < LEVELS.length; i++) {
-    if (xp >= LEVELS[i].minXP) {
-      currentLevel = LEVELS[i];
-      nextLevel = LEVELS[i + 1] || LEVELS[i];
+  for (let i = 0; i < RPG_LEVELS.length; i++) {
+    if (xp >= RPG_LEVELS[i].minXP) {
+      currentLevel = RPG_LEVELS[i];
+      nextLevel = RPG_LEVELS[i + 1] || RPG_LEVELS[i];
     } else {
       break;
     }
@@ -116,65 +103,76 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Gamification Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              Nível e XP
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-2xl font-bold">Nível {levelInfo.currentLevel.level}</span>
-                <span className="text-sm text-muted-foreground">{userProgress.xp} XP</span>
+      {/* RPG Gamification Header */}
+      <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer" />
+        <CardContent className="pt-6 relative z-10">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            {/* Level Circle Avatar */}
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg ring-4 ring-background">
+                <div className="text-center">
+                  <div className="text-3xl font-black text-white drop-shadow-lg">{levelInfo.currentLevel.level}</div>
+                  <div className="text-xs font-semibold text-white/90">NÍVEL</div>
+                </div>
               </div>
-              <p className="text-sm font-medium text-primary">{levelInfo.currentLevel.name}</p>
+              <div className="absolute -bottom-1 -right-1 text-3xl">{levelInfo.currentLevel.emoji}</div>
             </div>
-            <div className="space-y-1">
-              <Progress value={levelInfo.progressPercent} className="h-2" />
-              <p className="text-xs text-muted-foreground text-right">
-                {levelInfo.xpNeeded > 0 ? `${levelInfo.xpNeeded} XP para ${levelInfo.nextLevel.name}` : 'Nível Máximo!'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-destructive/50 bg-gradient-to-br from-destructive/5 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <Flame className="w-4 h-4" />
-              Ofensiva (Streak)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Flame className="w-16 h-16 text-destructive" />
-              <div>
-                <div className="text-4xl font-bold">{userProgress.streak}</div>
-                <p className="text-sm text-muted-foreground">dias seguidos</p>
+            {/* XP Progress Bar */}
+            <div className="flex-1 w-full space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold">{levelInfo.currentLevel.name}</h3>
+                  <p className="text-sm text-muted-foreground">{userProgress.xp} XP Total</p>
+                </div>
+                {levelInfo.xpNeeded > 0 && (
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-primary">Faltam {levelInfo.xpNeeded} XP</p>
+                    <p className="text-xs text-muted-foreground">para o próximo nível</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Animated Progress Bar */}
+              <div className="relative h-6 bg-muted rounded-full overflow-hidden border border-border">
+                <div 
+                  className="absolute inset-0 bg-gradient-to-r from-teal-500 via-blue-500 to-teal-500 transition-all duration-1000 ease-out animate-shimmer-bar"
+                  style={{ width: `${Math.min(levelInfo.progressPercent, 100)}%` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer-slow" />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-bold text-foreground drop-shadow-md mix-blend-difference">
+                    {Math.round(levelInfo.progressPercent)}%
+                  </span>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-accent/50 bg-gradient-to-br from-accent/5 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Total de Atividades
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold">{userProgress.totalActivities}</div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Questões + Aulas + Revisões
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            {/* Status Indicators */}
+            <div className="flex md:flex-col gap-4">
+              {/* Streak */}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20">
+                <Flame className="w-6 h-6 text-orange-500 animate-pulse" />
+                <div>
+                  <div className="text-2xl font-black">{userProgress.streak}</div>
+                  <div className="text-xs text-muted-foreground">dias</div>
+                </div>
+              </div>
+              
+              {/* Total Activities */}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+                <Trophy className="w-6 h-6 text-blue-500" />
+                <div>
+                  <div className="text-2xl font-black">{userProgress.totalActivities}</div>
+                  <div className="text-xs text-muted-foreground">atividades</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Metas da Semana */}
       <Card>

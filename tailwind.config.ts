@@ -71,6 +71,22 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        teal: {
+          400: "#2dd4bf",
+          500: "#14b8a6",
+        },
+        blue: {
+          500: "#3b82f6",
+        },
+        orange: {
+          500: "#f97316",
+        },
+        red: {
+          500: "#ef4444",
+        },
+        purple: {
+          500: "#a855f7",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

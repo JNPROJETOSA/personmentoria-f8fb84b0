@@ -24,3 +24,21 @@ export const MOCK_EXERCISES_INITIAL = [
   { id: '2', date: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0], area: MedicalArea.GO, topic: 'Sangramento Primeira Metade', totalQuestions: 10, correctAnswers: 8 },
   { id: '3', date: new Date().toISOString().split('T')[0], area: MedicalArea.CIRURGIA, topic: 'Trauma Abdominal', totalQuestions: 15, correctAnswers: 10 },
 ];
+
+// Sistema de Gamificação PerryMed RPG
+export const XP_REWARDS = {
+  EXERCISE: 10,         // Registrar bloco de exercícios
+  REVIEW: 5,            // Revisão espaçada
+  CLASS: 50,            // Cadastrar aula estudada
+  EXAM: 100,            // Registrar prova na íntegra
+};
+
+export const RPG_LEVELS = [
+  { level: 1, name: 'Interno', minXP: 0, emoji: '🔰' },
+  { level: 2, name: 'R1 Focado', minXP: 500, emoji: '🩺' },
+  { level: 3, name: 'R2 Experiente', minXP: 1500, emoji: '💉' },
+  { level: 4, name: 'R3 Especialista', minXP: 3000, emoji: '🎓' },
+  { level: 5, name: 'Chefe de Plantão', minXP: 5000, emoji: '🚨' },
+  { level: 6, name: 'Staff Respeitado', minXP: 8000, emoji: '🏆' },
+  { level: 7, name: 'Lenda da Medicina', minXP: 12000, emoji: '👑' },
+];
