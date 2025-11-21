@@ -6,7 +6,7 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial';
 
 export interface Flashcard {
   id: string;
@@ -102,4 +102,33 @@ export interface User {
   email: string;
   name: string;
   password: string;
+}
+
+export enum TopicStatus {
+  NOT_STARTED = 'not-started',
+  THEORY_SEEN = 'theory-seen',
+  MATERIALS_DONE = 'materials-done',
+  MASTERED = 'mastered'
+}
+
+export interface EditorialTopic {
+  id: string;
+  name: string;
+  status: TopicStatus;
+}
+
+export interface EditorialSubarea {
+  id: string;
+  name: string;
+  topics: EditorialTopic[];
+}
+
+export interface EditorialArea {
+  id: string;
+  name: MedicalArea;
+  subareas: EditorialSubarea[];
+}
+
+export interface EditorialData {
+  areas: EditorialArea[];
 }

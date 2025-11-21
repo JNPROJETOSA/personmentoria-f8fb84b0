@@ -58,3 +58,143 @@ export const EXAM_INSTITUTIONS = [
   'Revalida',
   'Outra'
 ] as const;
+
+// Template do Edital CNRM
+export const EDITORIAL_TEMPLATE = {
+  areas: [
+    {
+      id: 'pediatria',
+      name: MedicalArea.PEDIATRIA,
+      subareas: [
+        {
+          id: 'neo',
+          name: 'Neonatologia',
+          topics: [
+            { id: 'neo-1', name: 'Reanimação Neonatal', status: 'not-started' },
+            { id: 'neo-2', name: 'Icterícia Neonatal', status: 'not-started' },
+            { id: 'neo-3', name: 'Teste do Pezinho', status: 'not-started' },
+            { id: 'neo-4', name: 'Sepse Neonatal', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'infecto-ped',
+          name: 'Infectologia Pediátrica',
+          topics: [
+            { id: 'inf-1', name: 'Imunização', status: 'not-started' },
+            { id: 'inf-2', name: 'Doenças Exantemáticas', status: 'not-started' },
+            { id: 'inf-3', name: 'Pneumonias', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'cresc',
+          name: 'Crescimento e Desenvolvimento',
+          topics: [
+            { id: 'cresc-1', name: 'Marcos do Desenvolvimento', status: 'not-started' },
+            { id: 'cresc-2', name: 'Aleitamento Materno', status: 'not-started' },
+          ]
+        }
+      ]
+    },
+    {
+      id: 'clinica',
+      name: MedicalArea.CLINICA,
+      subareas: [
+        {
+          id: 'cardio',
+          name: 'Cardiologia',
+          topics: [
+            { id: 'card-1', name: 'Insuficiência Cardíaca', status: 'not-started' },
+            { id: 'card-2', name: 'Hipertensão Arterial', status: 'not-started' },
+            { id: 'card-3', name: 'Síndrome Coronariana Aguda', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'pneumo',
+          name: 'Pneumologia',
+          topics: [
+            { id: 'pneu-1', name: 'Asma', status: 'not-started' },
+            { id: 'pneu-2', name: 'DPOC', status: 'not-started' },
+            { id: 'pneu-3', name: 'Tuberculose', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'endo',
+          name: 'Endocrinologia',
+          topics: [
+            { id: 'endo-1', name: 'Diabetes Mellitus', status: 'not-started' },
+            { id: 'endo-2', name: 'Tireoidopatias', status: 'not-started' },
+          ]
+        }
+      ]
+    },
+    {
+      id: 'cirurgia',
+      name: MedicalArea.CIRURGIA,
+      subareas: [
+        {
+          id: 'trauma',
+          name: 'Trauma',
+          topics: [
+            { id: 'trauma-1', name: 'ATLS', status: 'not-started' },
+            { id: 'trauma-2', name: 'Trauma Abdominal', status: 'not-started' },
+            { id: 'trauma-3', name: 'Trauma Torácico', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'abdomen',
+          name: 'Cirurgia do Abdome',
+          topics: [
+            { id: 'abd-1', name: 'Abdome Agudo', status: 'not-started' },
+            { id: 'abd-2', name: 'Apendicite', status: 'not-started' },
+            { id: 'abd-3', name: 'Colecistite', status: 'not-started' },
+          ]
+        }
+      ]
+    },
+    {
+      id: 'go',
+      name: MedicalArea.GO,
+      subareas: [
+        {
+          id: 'obstetrica',
+          name: 'Obstetrícia',
+          topics: [
+            { id: 'obs-1', name: 'Pré-Natal', status: 'not-started' },
+            { id: 'obs-2', name: 'Trabalho de Parto', status: 'not-started' },
+            { id: 'obs-3', name: 'Hipertensão na Gestação', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'gineco',
+          name: 'Ginecologia',
+          topics: [
+            { id: 'gin-1', name: 'Câncer de Colo', status: 'not-started' },
+            { id: 'gin-2', name: 'Sangramento Uterino Anormal', status: 'not-started' },
+          ]
+        }
+      ]
+    },
+    {
+      id: 'preventiva',
+      name: MedicalArea.PREVENTIVA,
+      subareas: [
+        {
+          id: 'sus',
+          name: 'SUS',
+          topics: [
+            { id: 'sus-1', name: 'Princípios e Diretrizes', status: 'not-started' },
+            { id: 'sus-2', name: 'Atenção Primária', status: 'not-started' },
+          ]
+        },
+        {
+          id: 'epidemio',
+          name: 'Epidemiologia',
+          topics: [
+            { id: 'epi-1', name: 'Indicadores de Saúde', status: 'not-started' },
+            { id: 'epi-2', name: 'Vigilância Epidemiológica', status: 'not-started' },
+          ]
+        }
+      ]
+    }
+  ]
+};
