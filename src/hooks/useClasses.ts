@@ -25,10 +25,10 @@ export function useClasses(userId: string | undefined) {
         const mapped = data.map(c => ({
           id: c.id,
           title: c.title,
-          area: c.specialty,
+          area: c.specialty as any,
           date: c.date,
           studied: c.studied,
-          priority: c.priority
+          priority: c.priority as 1 | 2 | 3
         }));
         setClasses(mapped);
       }
@@ -60,10 +60,10 @@ export function useClasses(userId: string | undefined) {
       setClasses(prev => [...prev, {
         id: data.id,
         title: data.title,
-        area: data.specialty,
+        area: data.specialty as any,
         date: data.date,
         studied: data.studied,
-        priority: data.priority
+        priority: data.priority as 1 | 2 | 3
       }]);
     }
   };

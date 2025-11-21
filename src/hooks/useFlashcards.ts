@@ -24,7 +24,7 @@ export function useFlashcards(userId: string | undefined) {
       } else {
         const mapped = data.map(f => ({
           id: f.id,
-          area: f.area,
+          area: f.area as any,
           front: f.front,
           back: f.back,
           difficulty: null,
@@ -59,7 +59,7 @@ export function useFlashcards(userId: string | undefined) {
     } else {
       setFlashcards(prev => [...prev, {
         id: data.id,
-        area: data.area,
+        area: data.area as any,
         front: data.front,
         back: data.back,
         difficulty: null,
