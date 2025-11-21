@@ -23,6 +23,9 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useClasses } from '@/hooks/useClasses';
+import { useExercises } from '@/hooks/useExercises';
+import { useFlashcards } from '@/hooks/useFlashcards';
 
 const AuthenticatedApp = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -31,18 +34,12 @@ const AuthenticatedApp = () => {
   const { user, signOut } = useAuth();
   const { profile } = useProfile(user?.id);
   
+  // Cloud database hooks
+  const { classes, setClasses } = useClasses(user?.id);
+  const { exercises, setExercises } = useExercises(user?.id);
+  const { flashcards, setFlashcards } = useFlashcards(user?.id);
+  
   const storagePrefix = `perry_${user?.id}_`;
-
-  const [classes, setClasses] = useState<ClassItem[]>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'classes');
-    const parsed = saved ? JSON.parse(saved) : MOCK_CLASSES_INITIAL;
-    return parsed.map((c: any) => ({ ...c, priority: c.priority || 2 }));
-  });
-
-  const [exercises, setExercises] = useState<ExerciseLog[]>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'exercises');
-    return saved ? JSON.parse(saved) : MOCK_EXERCISES_INITIAL;
-  });
 
   const [exams, setExams] = useState<ExamLog[]>(() => {
     const saved = localStorage.getItem(storagePrefix + 'exams');
@@ -85,10 +82,6 @@ const AuthenticatedApp = () => {
     };
   });
 
-  const [flashcards, setFlashcards] = useState<Flashcard[]>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'flashcards');
-    return saved ? JSON.parse(saved) : [];
-  });
 
   const [dreamBoardItems, setDreamBoardItems] = useState<DreamBoardItem[]>(() => {
     const saved = localStorage.getItem(storagePrefix + 'dream_board');
@@ -148,14 +141,13 @@ const AuthenticatedApp = () => {
     });
   }, [exercises, exams, classes]);
 
-  useEffect(() => { localStorage.setItem(storagePrefix + 'classes', JSON.stringify(classes)); }, [classes]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'exercises', JSON.stringify(exercises)); }, [exercises]);
+  // Classes, exercises, and flashcards now sync automatically via hooks
   useEffect(() => { localStorage.setItem(storagePrefix + 'exams', JSON.stringify(exams)); }, [exams]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'notebook', JSON.stringify(notebookData)); }, [notebookData]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'manual_reviews', JSON.stringify(manualReviews)); }, [manualReviews]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'goals', JSON.stringify(goals)); }, [goals]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'user_progress', JSON.stringify(userProgress)); }, [userProgress]);
-  useEffect(() => { localStorage.setItem(storagePrefix + 'flashcards', JSON.stringify(flashcards)); }, [flashcards]);
+  
   useEffect(() => { localStorage.setItem(storagePrefix + 'dream_board', JSON.stringify(dreamBoardItems)); }, [dreamBoardItems]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'editorial', JSON.stringify(editorialData)); }, [editorialData]);
   useEffect(() => { localStorage.setItem(storagePrefix + 'burnout', JSON.stringify(burnoutData)); }, [burnoutData]);

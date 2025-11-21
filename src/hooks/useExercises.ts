@@ -25,7 +25,7 @@ export function useExercises(userId: string | undefined) {
         const mapped = data.map(e => ({
           id: e.id,
           date: e.date,
-          area: e.specialty,
+          area: e.specialty as any,
           topic: e.topic,
           totalQuestions: e.total_questions,
           correctAnswers: e.correct_answers
@@ -60,7 +60,7 @@ export function useExercises(userId: string | undefined) {
       setExercises(prev => [...prev, {
         id: data.id,
         date: data.date,
-        area: data.specialty,
+        area: data.specialty as any,
         topic: data.topic,
         totalQuestions: data.total_questions,
         correctAnswers: data.correct_answers
