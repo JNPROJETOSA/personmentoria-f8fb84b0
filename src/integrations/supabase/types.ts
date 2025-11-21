@@ -113,6 +113,39 @@ export type Database = {
         }
         Relationships: []
       }
+      editorial_progress: {
+        Row: {
+          area: string
+          created_at: string | null
+          id: string
+          status: string
+          sub_area: string
+          topic: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          area: string
+          created_at?: string | null
+          id?: string
+          status?: string
+          sub_area: string
+          topic: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          area?: string
+          created_at?: string | null
+          id?: string
+          status?: string
+          sub_area?: string
+          topic?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       exam_sessions: {
         Row: {
           completed_at: string
@@ -239,6 +272,36 @@ export type Database = {
         }
         Relationships: []
       }
+      goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          target_accuracy: number
+          target_topics_per_week: number
+          updated_at: string | null
+          user_id: string
+          weekly_questions: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          target_accuracy?: number
+          target_topics_per_week?: number
+          updated_at?: string | null
+          user_id: string
+          weekly_questions?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          target_accuracy?: number
+          target_topics_per_week?: number
+          updated_at?: string | null
+          user_id?: string
+          weekly_questions?: number
+        }
+        Relationships: []
+      }
       invite_codes: {
         Row: {
           active: boolean | null
@@ -307,6 +370,7 @@ export type Database = {
           level: number | null
           name: string
           streak: number | null
+          total_activities: number | null
           updated_at: string | null
           user_id: string
           xp: number | null
@@ -318,6 +382,7 @@ export type Database = {
           level?: number | null
           name: string
           streak?: number | null
+          total_activities?: number | null
           updated_at?: string | null
           user_id: string
           xp?: number | null
@@ -329,6 +394,7 @@ export type Database = {
           level?: number | null
           name?: string
           streak?: number | null
+          total_activities?: number | null
           updated_at?: string | null
           user_id?: string
           xp?: number | null

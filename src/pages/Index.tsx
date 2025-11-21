@@ -26,6 +26,9 @@ import { useProfile } from '@/hooks/useProfile';
 import { useClasses } from '@/hooks/useClasses';
 import { useExercises } from '@/hooks/useExercises';
 import { useFlashcards } from '@/hooks/useFlashcards';
+import { useGoals } from '@/hooks/useGoals';
+import { useDreamBoard } from '@/hooks/useDreamBoard';
+import { useNotebook } from '@/hooks/useNotebook';
 
 const AuthenticatedApp = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -38,6 +41,9 @@ const AuthenticatedApp = () => {
   const { classes, addClass, updateClass, deleteClass } = useClasses(user?.id);
   const { exercises, addExercise, deleteExercise } = useExercises(user?.id);
   const { flashcards, addFlashcard, deleteFlashcard } = useFlashcards(user?.id);
+  const { goals, updateGoals } = useGoals(user?.id);
+  const { items: dreamBoardItems, addItem: addDreamItem, deleteItem: deleteDreamItem } = useDreamBoard(user?.id);
+  const { notebookData, updateNotebook } = useNotebook(user?.id);
   
   const storagePrefix = `perry_${user?.id}_`;
 
@@ -46,29 +52,9 @@ const AuthenticatedApp = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [notebookData, setNotebookData] = useState<NotebookData>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'notebook');
-    return saved ? JSON.parse(saved) : {
-      [MedicalArea.PEDIATRIA]: '',
-      [MedicalArea.GO]: '',
-      [MedicalArea.PREVENTIVA]: '',
-      [MedicalArea.CLINICA]: '',
-      [MedicalArea.CIRURGIA]: ''
-    };
-  });
-
   const [manualReviews, setManualReviews] = useState<ManualReviewLog[]>(() => {
     const saved = localStorage.getItem(storagePrefix + 'manual_reviews');
     return saved ? JSON.parse(saved) : [];
-  });
-
-  const [goals, setGoals] = useState<Goals>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'goals');
-    return saved ? JSON.parse(saved) : {
-      weeklyQuestions: 50,
-      targetAccuracy: 80,
-      targetTopicsPerWeek: 5
-    };
   });
 
   const [userProgress, setUserProgress] = useState<UserProgress>(() => {
@@ -80,12 +66,6 @@ const AuthenticatedApp = () => {
       lastStudyDate: null,
       totalActivities: 0
     };
-  });
-
-
-  const [dreamBoardItems, setDreamBoardItems] = useState<DreamBoardItem[]>(() => {
-    const saved = localStorage.getItem(storagePrefix + 'dream_board');
-    return saved ? JSON.parse(saved) : [];
   });
 
   const [editorialData, setEditorialData] = useState<EditorialData>(() => {
@@ -216,7 +196,7 @@ const AuthenticatedApp = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={setGoals} userProgress={userProgress} />;
+      case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
       case 'analysis': return <Analysis exercises={exercises} />;
       case 'classes': return <Classes classes={classes} addClass={addClass} updateClass={updateClass} deleteClass={deleteClass} />;
       case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} />;
@@ -224,15 +204,15 @@ const AuthenticatedApp = () => {
       case 'exams': return <Exams exams={exams} setExams={setExams} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
-      case 'notebook': return <Notebook data={notebookData} setData={setNotebookData} />;
+      case 'notebook': return <Notebook data={notebookData} onUpdate={updateNotebook} />;
       case 'pomodoro': return <Pomodoro />;
       case 'flashcards': return <Flashcards flashcards={flashcards} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} />;
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
-      case 'dream-board': return <DreamBoard items={dreamBoardItems} setItems={setDreamBoardItems} />;
+      case 'dream-board': return <DreamBoard items={dreamBoardItems} addItem={addDreamItem} deleteItem={deleteDreamItem} />;
       case 'editorial': return <Editorial editorialData={editorialData} setEditorialData={setEditorialData} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
       case 'xo-burnout': return <XoBurnout burnoutData={burnoutData} setBurnoutData={setBurnoutData} />;
       case 'exam-mode': return <ExamMode examModeData={examModeData} setExamModeData={setExamModeData} />;
-      default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={setGoals} userProgress={userProgress} />;
+      default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
     }
   };
 
