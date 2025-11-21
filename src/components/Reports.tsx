@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ExerciseLog, ClassItem, ExamLog, MedicalArea } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { getPerformanceColor } from '@/lib/utils';
 
 interface ReportsProps {
@@ -47,53 +48,114 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       return date >= start && date <= end;
     });
 
+    const filteredClasses = classes.filter(cls => {
+      const date = new Date(cls.date);
+      return date >= start && date <= end && cls.studied;
+    });
+
     const totalQuestions = filteredExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
     const totalCorrect = filteredExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
     const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
 
-    // Generate PDF
+    // Generate PDF with professional design
     try {
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
-      let yPosition = 20;
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-      // Title
-      pdf.setFontSize(22);
-      pdf.setTextColor(66, 133, 244);
-      pdf.text('PERRYMED - Relatório de Desempenho', pageWidth / 2, yPosition, { align: 'center' });
+      // Perry Teal color (#0d9488 = RGB: 13, 148, 136)
+      const perryTeal: [number, number, number] = [13, 148, 136];
+      const indigoHeader: [number, number, number] = [79, 70, 229];
+      const slateHeader: [number, number, number] = [51, 65, 85];
+      const royalBlueHeader: [number, number, number] = [37, 99, 235];
+      const emeraldHeader: [number, number, number] = [16, 185, 129];
+
+      // Helper function to add footer to each page
+      const addFooter = () => {
+        const pageCount = (pdf as any).internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          pdf.setPage(i);
+          pdf.setFontSize(8);
+          pdf.setTextColor(150, 150, 150);
+          pdf.text(
+            `Gerado em ${new Date().toLocaleString('pt-BR')} via PERRYMED - Página ${i} de ${pageCount}`,
+            pageWidth / 2,
+            pageHeight - 10,
+            { align: 'center' }
+          );
+        }
+      };
+
+      // 1. CABEÇALHO INSTITUCIONAL (Header Institucional)
+      // Barra superior Perry Teal
+      pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
+      pdf.rect(0, 0, pageWidth, 25, 'F');
       
-      yPosition += 15;
-      pdf.setFontSize(11);
-      pdf.setTextColor(100, 100, 100);
+      // Título em branco
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('PERRYMED - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
+      
+      // Subtítulo de período
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(240, 240, 240);
       pdf.text(
         `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`,
         pageWidth / 2,
-        yPosition,
+        19,
         { align: 'center' }
       );
 
-      // Summary section
-      yPosition += 20;
-      pdf.setFontSize(16);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text('Resumo Geral', 14, yPosition);
-      
-      yPosition += 10;
-      pdf.setFontSize(11);
-      pdf.text(`Total de Questões: ${totalQuestions}`, 14, yPosition);
-      yPosition += 7;
-      pdf.text(`Acertos: ${totalCorrect}`, 14, yPosition);
-      yPosition += 7;
-      pdf.text(`Acurácia: ${accuracy.toFixed(1)}%`, 14, yPosition);
-      yPosition += 7;
-      pdf.text(`Sessões de Estudo: ${filteredExercises.length}`, 14, yPosition);
+      let yPosition = 35;
 
-      // Performance by area
-      yPosition += 15;
-      pdf.setFontSize(16);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text('Desempenho por Área', 14, yPosition);
+      // 2. QUADRO DE RESUMO (Executive Summary Card)
+      // Fundo cinza suave com bordas arredondadas
+      pdf.setFillColor(245, 247, 250);
+      pdf.roundedRect(14, yPosition, pageWidth - 28, 35, 3, 3, 'F');
       
+      // Borda sutil
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setLineWidth(0.5);
+      pdf.roundedRect(14, yPosition, pageWidth - 28, 35, 3, 3, 'S');
+
+      // KPIs dentro do card
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(100, 100, 100);
+      
+      const kpiX = 25;
+      const kpiSpacing = 55;
+      
+      // Questões Totais
+      pdf.text('QUESTÕES TOTAIS', kpiX, yPosition + 10);
+      pdf.setFontSize(24);
+      pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
+      pdf.text(totalQuestions.toString(), kpiX, yPosition + 23);
+      
+      // Acertos
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('ACERTOS', kpiX + kpiSpacing, yPosition + 10);
+      pdf.setFontSize(24);
+      pdf.setTextColor(16, 185, 129); // Emerald
+      pdf.text(totalCorrect.toString(), kpiX + kpiSpacing, yPosition + 23);
+      
+      // Aproveitamento
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('APROVEITAMENTO', kpiX + kpiSpacing * 2, yPosition + 10);
+      pdf.setFontSize(24);
+      // Color based on performance
+      if (accuracy >= 80) pdf.setTextColor(16, 185, 129); // Green
+      else if (accuracy >= 60) pdf.setTextColor(245, 158, 11); // Amber
+      else pdf.setTextColor(239, 68, 68); // Red
+      pdf.text(`${accuracy.toFixed(1)}%`, kpiX + kpiSpacing * 2, yPosition + 23);
+
+      yPosition += 45;
+
+      // 3. TABELA 1: Desempenho Estratégico por Grande Área
       const areaStats = Object.values(MedicalArea).map(area => {
         const areaExercises = filteredExercises.filter(ex => ex.area === area);
         const total = areaExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
@@ -102,74 +164,168 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
         return {
           area,
           total,
+          correct,
           accuracy: total > 0 ? (correct / total) * 100 : 0
         };
       }).filter(a => a.total > 0);
 
-      yPosition += 10;
-      pdf.setFontSize(11);
-      areaStats.forEach(stat => {
-        if (yPosition > 270) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.text(`${stat.area}: ${stat.total} questões - ${stat.accuracy.toFixed(1)}% de acerto`, 14, yPosition);
-        yPosition += 7;
-      });
-
-      // Exercise sessions
-      if (filteredExercises.length > 0) {
-        yPosition += 10;
-        if (yPosition > 250) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFontSize(16);
-        pdf.text('Sessões de Estudo', 14, yPosition);
-        
-        yPosition += 10;
-        pdf.setFontSize(10);
-        filteredExercises.forEach(ex => {
-          if (yPosition > 270) {
-            pdf.addPage();
-            yPosition = 20;
+      if (areaStats.length > 0) {
+        autoTable(pdf, {
+          startY: yPosition,
+          head: [['Área Médica', 'Questões', 'Acertos', 'Nota (%)']],
+          body: areaStats.map(stat => [
+            stat.area,
+            stat.total.toString(),
+            stat.correct.toString(),
+            `${stat.accuracy.toFixed(1)}%`
+          ]),
+          theme: 'striped',
+          headStyles: {
+            fillColor: indigoHeader,
+            textColor: 255,
+            fontSize: 11,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          styles: {
+            fontSize: 10,
+            cellPadding: 5
+          },
+          columnStyles: {
+            0: { halign: 'left', fontStyle: 'bold' },
+            1: { halign: 'center' },
+            2: { halign: 'center' },
+            3: { halign: 'center', fontStyle: 'bold' }
+          },
+          alternateRowStyles: {
+            fillColor: [250, 250, 250]
           }
-          const exAccuracy = (ex.correctAnswers / ex.totalQuestions) * 100;
-          pdf.text(
-            `${new Date(ex.date).toLocaleDateString('pt-BR')} - ${ex.area} - ${ex.topic}: ${ex.correctAnswers}/${ex.totalQuestions} (${exAccuracy.toFixed(0)}%)`,
-            14,
-            yPosition
-          );
-          yPosition += 6;
         });
+
+        yPosition = (pdf as any).lastAutoTable.finalY + 15;
       }
 
-      // Exams
+      // 4. TABELA 2: Provas na Íntegra (Simulados)
       if (filteredExams.length > 0) {
-        yPosition += 10;
-        if (yPosition > 250) {
+        if (yPosition > pageHeight - 60) {
           pdf.addPage();
           yPosition = 20;
         }
-        pdf.setFontSize(16);
-        pdf.text('Provas Antigas', 14, yPosition);
-        
-        yPosition += 10;
-        pdf.setFontSize(10);
-        filteredExams.forEach(exam => {
-          if (yPosition > 270) {
-            pdf.addPage();
-            yPosition = 20;
+
+        autoTable(pdf, {
+          startY: yPosition,
+          head: [['Data', 'Nome da Prova', 'Placar Bruto', 'Porcentagem']],
+          body: filteredExams.map(exam => [
+            new Date(exam.date).toLocaleDateString('pt-BR'),
+            exam.name,
+            `${exam.correctAnswers}/${exam.totalQuestions}`,
+            `${((exam.correctAnswers / exam.totalQuestions) * 100).toFixed(1)}%`
+          ]),
+          theme: 'grid',
+          headStyles: {
+            fillColor: slateHeader,
+            textColor: 255,
+            fontSize: 11,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          styles: {
+            fontSize: 10,
+            cellPadding: 5
+          },
+          columnStyles: {
+            0: { halign: 'center' },
+            1: { halign: 'left', fontStyle: 'bold' },
+            2: { halign: 'center' },
+            3: { halign: 'center', fontStyle: 'bold' }
           }
-          const examAccuracy = (exam.correctAnswers / exam.totalQuestions) * 100;
-          pdf.text(
-            `${new Date(exam.date).toLocaleDateString('pt-BR')} - ${exam.name}: ${exam.correctAnswers}/${exam.totalQuestions} (${examAccuracy.toFixed(0)}%)`,
-            14,
-            yPosition
-          );
-          yPosition += 6;
+        });
+
+        yPosition = (pdf as any).lastAutoTable.finalY + 15;
+      }
+
+      // 5. TABELA 3: Histórico Detalhado (Log de Exercícios)
+      if (filteredExercises.length > 0) {
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+
+        autoTable(pdf, {
+          startY: yPosition,
+          head: [['Data', 'Frente', 'Tema Específico', 'Desempenho']],
+          body: filteredExercises.map(ex => [
+            new Date(ex.date).toLocaleDateString('pt-BR'),
+            ex.area,
+            ex.topic,
+            `${ex.correctAnswers}/${ex.totalQuestions} (${((ex.correctAnswers / ex.totalQuestions) * 100).toFixed(0)}%)`
+          ]),
+          theme: 'striped',
+          headStyles: {
+            fillColor: royalBlueHeader,
+            textColor: 255,
+            fontSize: 11,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          styles: {
+            fontSize: 9,
+            cellPadding: 4
+          },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 25 },
+            1: { halign: 'left', cellWidth: 40 },
+            2: { halign: 'left' },
+            3: { halign: 'center', fontStyle: 'bold', cellWidth: 35 }
+          },
+          alternateRowStyles: {
+            fillColor: [250, 250, 250]
+          }
+        });
+
+        yPosition = (pdf as any).lastAutoTable.finalY + 15;
+      }
+
+      // 6. TABELA 4: Aulas Teóricas (Opcional/Condicional)
+      if (filteredClasses.length > 0) {
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+
+        autoTable(pdf, {
+          startY: yPosition,
+          head: [['Data', 'Frente', 'Título da Aula']],
+          body: filteredClasses.map(cls => [
+            new Date(cls.date).toLocaleDateString('pt-BR'),
+            cls.area,
+            cls.title
+          ]),
+          theme: 'striped',
+          headStyles: {
+            fillColor: emeraldHeader,
+            textColor: 255,
+            fontSize: 11,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          styles: {
+            fontSize: 10,
+            cellPadding: 5
+          },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 30 },
+            1: { halign: 'left', cellWidth: 40 },
+            2: { halign: 'left' }
+          },
+          alternateRowStyles: {
+            fillColor: [250, 250, 250]
+          }
         });
       }
+
+      // 7. RODAPÉ (Footer) - Add to all pages
+      addFooter();
 
       // Save PDF
       pdf.save(`PERRYMED_Relatorio_${startDate}_a_${endDate}.pdf`);
