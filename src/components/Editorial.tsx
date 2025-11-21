@@ -15,8 +15,9 @@ import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
 
 interface EditorialProps {
-  editorialData: EditorialData;
-  setEditorialData: (data: EditorialData) => void;
+  data: EditorialData;
+  setData: (data: EditorialData) => void;
+  updateTopicStatus: (areaName: string, subareaName: string, topicName: string, status: string) => Promise<void>;
   onAddXP: (xp: number) => void;
   onTabChange: (tab: string) => void;
 }
@@ -48,7 +49,7 @@ const STATUS_CONFIG = {
   }
 };
 
-export default function Editorial({ editorialData, setEditorialData, onAddXP, onTabChange }: EditorialProps) {
+export default function Editorial({ data: editorialData, setData: setEditorialData, updateTopicStatus, onAddXP, onTabChange }: EditorialProps) {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [expandedSubareas, setExpandedSubareas] = useState<Set<string>>(new Set());
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
@@ -114,7 +115,7 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
     setExpandedSubareas(newExpanded);
   };
 
-  const updateTopicStatus = (areaId: string, subareaId: string, topicId: string, newStatus: TopicStatus) => {
+  const handleTopicStatusChange = async (areaId: string, subareaId: string, topicId: string, newStatus: TopicStatus) => {
     const updatedData = { ...editorialData };
     const area = updatedData.areas.find(a => a.id === areaId);
     if (!area) return;
@@ -129,6 +130,9 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
     topic.status = newStatus;
 
     setEditorialData(updatedData);
+    
+    // Save to cloud
+    await updateTopicStatus(area.name, subarea.name, topic.name, newStatus);
 
     // Check if area is now 100% complete for gamification
     const areaProgress = calculateAreaProgress(area);
@@ -505,7 +509,7 @@ export default function Editorial({ editorialData, setEditorialData, onAddXP, on
                   key={status}
                   variant="outline"
                   className={`justify-start h-auto p-4 ${config.badge}`}
-                  onClick={() => updateTopicStatus(
+                  onClick={() => handleTopicStatusChange(
                     selectedTopic.areaId,
                     selectedTopic.subareaId,
                     selectedTopic.topicId,
