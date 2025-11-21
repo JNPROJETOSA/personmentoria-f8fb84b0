@@ -170,7 +170,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <Card className="h-[calc(100vh-16rem)]">
+      <Card className="h-[calc(100vh-10rem)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BrainCircuit className="w-5 h-5 text-primary" />
