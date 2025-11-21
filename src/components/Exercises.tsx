@@ -12,10 +12,11 @@ import { getPerformanceColor } from '@/lib/utils';
 
 interface ExercisesProps {
   exercises: ExerciseLog[];
-  setExercises: (exercises: ExerciseLog[]) => void;
+  addExercise: (exercise: Omit<ExerciseLog, 'id'>) => Promise<void>;
+  deleteExercise: (id: string) => Promise<void>;
 }
 
-export default function Exercises({ exercises, setExercises }: ExercisesProps) {
+export default function Exercises({ exercises, addExercise, deleteExercise }: ExercisesProps) {
   const [newExercise, setNewExercise] = useState<Partial<ExerciseLog>>({
     date: new Date().toISOString().split('T')[0],
     area: MedicalArea.CLINICA,
@@ -24,7 +25,7 @@ export default function Exercises({ exercises, setExercises }: ExercisesProps) {
     correctAnswers: 0
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newExercise.topic?.trim()) {
       toast({
         title: "Campo obrigatório",
@@ -52,8 +53,7 @@ export default function Exercises({ exercises, setExercises }: ExercisesProps) {
       return;
     }
 
-    const item: ExerciseLog = {
-      id: Date.now().toString(),
+    const item: Omit<ExerciseLog, 'id'> = {
       date: newExercise.date!,
       area: newExercise.area!,
       topic: newExercise.topic,
@@ -61,7 +61,7 @@ export default function Exercises({ exercises, setExercises }: ExercisesProps) {
       correctAnswers: newExercise.correctAnswers!
     };
 
-    setExercises([...exercises, item]);
+    await addExercise(item);
     
     const accuracy = (item.correctAnswers / item.totalQuestions) * 100;
     toast({
@@ -78,8 +78,8 @@ export default function Exercises({ exercises, setExercises }: ExercisesProps) {
     });
   };
 
-  const handleDelete = (id: string) => {
-    setExercises(exercises.filter(e => e.id !== id));
+  const handleDelete = async (id: string) => {
+    await deleteExercise(id);
     toast({
       title: "Exercício removido",
       description: "O registro foi excluído.",

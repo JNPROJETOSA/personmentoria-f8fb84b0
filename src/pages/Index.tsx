@@ -35,9 +35,9 @@ const AuthenticatedApp = () => {
   const { profile } = useProfile(user?.id);
   
   // Cloud database hooks
-  const { classes, setClasses } = useClasses(user?.id);
-  const { exercises, setExercises } = useExercises(user?.id);
-  const { flashcards, setFlashcards } = useFlashcards(user?.id);
+  const { classes, addClass, updateClass, deleteClass } = useClasses(user?.id);
+  const { exercises, addExercise, deleteExercise } = useExercises(user?.id);
+  const { flashcards, addFlashcard, deleteFlashcard } = useFlashcards(user?.id);
   
   const storagePrefix = `perry_${user?.id}_`;
 
@@ -218,15 +218,15 @@ const AuthenticatedApp = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={setGoals} userProgress={userProgress} />;
       case 'analysis': return <Analysis exercises={exercises} />;
-      case 'classes': return <Classes classes={classes} setClasses={setClasses} />;
-      case 'exercises': return <Exercises exercises={exercises} setExercises={setExercises} />;
+      case 'classes': return <Classes classes={classes} addClass={addClass} updateClass={updateClass} deleteClass={deleteClass} />;
+      case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} />;
       case 'reviews': return <Reviews reviews={pendingReviews} onMarkReviewed={handleMarkReviewed} manualReviews={manualReviews} />;
       case 'exams': return <Exams exams={exams} setExams={setExams} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
       case 'notebook': return <Notebook data={notebookData} setData={setNotebookData} />;
       case 'pomodoro': return <Pomodoro />;
-      case 'flashcards': return <Flashcards flashcards={flashcards} setFlashcards={setFlashcards} />;
+      case 'flashcards': return <Flashcards flashcards={flashcards} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} />;
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} setItems={setDreamBoardItems} />;
       case 'editorial': return <Editorial editorialData={editorialData} setEditorialData={setEditorialData} onAddXP={handleAddXP} onTabChange={handleTabChange} />;
