@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, BookOpen } from 'lucide-react';
+import { useState, useRef, useEffect, Fragment } from 'react';
+import { Plus, Trash2, BookOpen, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ClassItem, MedicalArea } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
@@ -28,6 +27,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -75,6 +75,12 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     const classItem = classes.find(c => c.id === id);
     if (classItem) {
       await updateClass(id, { studied: !classItem.studied });
+      if (isMountedRef.current && !classItem.studied) {
+        toast({
+          title: "Aula concluída!",
+          description: `"${classItem.title}" foi marcada como estudada.`,
+        });
+      }
     }
   };
 
@@ -88,11 +94,67 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     }
   };
 
-  const sortedClasses = [...classes].sort((a, b) => {
-    if (a.studied !== b.studied) return a.studied ? 1 : -1;
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
-  });
+  // Separate pending and studied classes
+  const pendingClasses = classes
+    .filter(c => !c.studied)
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
+  const studiedClasses = classes
+    .filter(c => c.studied)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const ClassCard = ({ cls, isStudied }: { cls: ClassItem; isStudied: boolean }) => (
+    <div
+      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+        isStudied 
+          ? 'bg-muted/50 border-muted' 
+          : 'bg-card hover:bg-accent/50'
+      }`}
+    >
+      <Button
+        variant={isStudied ? "secondary" : "outline"}
+        size="icon"
+        onClick={() => handleToggle(cls.id)}
+        className={`shrink-0 ${isStudied ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400' : ''}`}
+        title={isStudied ? "Desmarcar como estudada" : "Marcar como estudada"}
+      >
+        <CheckCircle2 className="w-4 h-4" />
+      </Button>
+      
+      <div className="flex-1 min-w-0">
+        <span className={`block font-medium ${isStudied ? 'text-muted-foreground' : ''}`}>
+          {cls.title}
+        </span>
+        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+          <span
+            className="inline-block w-2 h-2 rounded-full"
+            style={{ backgroundColor: AREA_COLORS[cls.area] }}
+          />
+          <span>{cls.area}</span>
+          <span>•</span>
+          <span>{new Date(cls.date).toLocaleDateString('pt-BR')}</span>
+          <span>•</span>
+          <span>
+            {cls.priority === 1 && '⚡ Alta'}
+            {cls.priority === 2 && '⭐ Média'}
+            {cls.priority === 3 && '💤 Baixa'}
+          </span>
+        </div>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => handleDelete(cls.id)}
+        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
+    </div>
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -166,74 +228,58 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
         </CardContent>
       </Card>
 
-      {/* Classes List */}
+      {/* Pending Classes */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpen className="w-5 h-5" />
-            Minhas Aulas ({classes.length})
+            Aulas Pendentes ({pendingClasses.length})
           </CardTitle>
           <CardDescription>
-            {classes.filter(c => c.studied).length} assistidas • {classes.filter(c => !c.studied).length} pendentes
+            Aulas que ainda não foram estudadas
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {sortedClasses.map(cls => (
-              <div
-                key={cls.id}
-                className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-              >
-                <Checkbox
-                  checked={cls.studied}
-                  onCheckedChange={() => handleToggle(cls.id)}
-                  id={`class-${cls.id}`}
-                />
-                
-                <div className="flex-1 min-w-0">
-                  <label 
-                    htmlFor={`class-${cls.id}`}
-                    className={`block font-medium cursor-pointer ${cls.studied ? 'line-through text-muted-foreground' : ''}`}
-                  >
-                    {cls.title}
-                  </label>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <span
-                      className="inline-block w-2 h-2 rounded-full"
-                      style={{ backgroundColor: AREA_COLORS[cls.area] }}
-                    />
-                    <span>{cls.area}</span>
-                    <span>•</span>
-                    <span>{new Date(cls.date).toLocaleDateString('pt-BR')}</span>
-                    <span>•</span>
-                    <span>
-                      {cls.priority === 1 && '⚡ Alta'}
-                      {cls.priority === 2 && '⭐ Média'}
-                      {cls.priority === 3 && '💤 Baixa'}
-                    </span>
-                  </div>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(cls.id)}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
+            {pendingClasses.map(cls => (
+              <Fragment key={cls.id}>
+                <ClassCard cls={cls} isStudied={false} />
+              </Fragment>
             ))}
 
-            {sortedClasses.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma aula registrada ainda.</p>
+            {pendingClasses.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle2 className="w-10 h-10 mx-auto mb-2 opacity-50 text-emerald-500" />
+                <p>Todas as aulas foram estudadas!</p>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Studied Classes */}
+      {studiedClasses.length > 0 && (
+        <Card className="border-emerald-200 dark:border-emerald-900/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="w-5 h-5" />
+              Aulas Estudadas ({studiedClasses.length})
+            </CardTitle>
+            <CardDescription>
+              Aulas que você já concluiu
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {studiedClasses.map(cls => (
+                <Fragment key={cls.id}>
+                  <ClassCard cls={cls} isStudied={true} />
+                </Fragment>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

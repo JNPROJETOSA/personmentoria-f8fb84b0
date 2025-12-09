@@ -104,10 +104,6 @@ const AuthenticatedApp = () => {
     });
   }, [exercises.length, exams.length, classes.filter(c => c.studied).length]);
 
-  const handleMarkReviewed = (topic: string) => {
-    addReview(topic);
-  };
-
   const pendingReviews = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     const reviews: any[] = [];
@@ -149,6 +145,20 @@ const AuthenticatedApp = () => {
     });
   }, [exercises, manualReviews, classes]);
 
+  const handleMarkReviewed = (topic: string) => {
+    addReview(topic);
+  };
+
+  // Auto-complete reviews when new exercises are added for a topic with pending review
+  const handleAutoCompleteReview = (topic: string) => {
+    const hasPendingReview = pendingReviews.some(
+      r => r.topic.toLowerCase() === topic.toLowerCase()
+    );
+    if (hasPendingReview) {
+      addReview(topic);
+    }
+  };
+
   const handleAddXP = (xp: number) => {
     if (profile) {
       updateProfile({
@@ -166,7 +176,7 @@ const AuthenticatedApp = () => {
       case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
       case 'analysis': return <Analysis exercises={exercises} />;
       case 'classes': return <Classes classes={classes} addClass={addClass} updateClass={updateClass} deleteClass={deleteClass} />;
-      case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} />;
+      case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} classes={classes} onAutoCompleteReview={handleAutoCompleteReview} />;
       case 'reviews': return <Reviews reviews={pendingReviews} onMarkReviewed={handleMarkReviewed} manualReviews={manualReviews} />;
       case 'exams': return <Exams exams={exams} addExam={addExam} deleteExam={deleteExam} addXP={handleAddXP} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;

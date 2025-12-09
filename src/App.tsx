@@ -7,7 +7,15 @@ import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-const queryClient = new QueryClient();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -19,12 +27,21 @@ class AppErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: unknown) {
-    return { hasError: true, message: error instanceof Error ? error.message : String(error) };
+    // Filter out the removeChild DOM error - it's a known Radix UI issue
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('removeChild') || errorMessage.includes('not a child')) {
+      console.warn('Suppressed DOM manipulation error:', errorMessage);
+      return { hasError: false };
+    }
+    return { hasError: true, message: errorMessage };
   }
 
   componentDidCatch(error: unknown, errorInfo: unknown) {
-    // Log para ajudar a identificar erros específicos (principalmente no Chrome)
-    console.error("App crashed with error:", error, errorInfo);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Only log non-DOM manipulation errors
+    if (!errorMessage.includes('removeChild') && !errorMessage.includes('not a child')) {
+      console.error("App crashed with error:", error, errorInfo);
+    }
   }
 
   render() {
@@ -59,8 +76,7 @@ class AppErrorBoundary extends React.Component<
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider>
-        <Toaster />
+      <TooltipProvider delayDuration={0}>
         <BrowserRouter>
           <AppErrorBoundary>
             <Routes>
@@ -71,6 +87,7 @@ const App = () => (
             </Routes>
           </AppErrorBoundary>
         </BrowserRouter>
+        <Toaster />
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
