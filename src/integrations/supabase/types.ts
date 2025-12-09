@@ -117,6 +117,7 @@ export type Database = {
         Row: {
           area: string
           created_at: string | null
+          editorial_id: string | null
           id: string
           status: string
           sub_area: string
@@ -127,6 +128,7 @@ export type Database = {
         Insert: {
           area: string
           created_at?: string | null
+          editorial_id?: string | null
           id?: string
           status?: string
           sub_area: string
@@ -137,11 +139,44 @@ export type Database = {
         Update: {
           area?: string
           created_at?: string | null
+          editorial_id?: string | null
           id?: string
           status?: string
           sub_area?: string
           topic?: string
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_progress_editorial_id_fkey"
+            columns: ["editorial_id"]
+            isOneToOne: false
+            referencedRelation: "editorials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorials: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
