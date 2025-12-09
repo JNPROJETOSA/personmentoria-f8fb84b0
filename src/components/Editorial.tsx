@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, BookOpen, Plus, Zap, Trophy, Sparkles } from 'lucide-react';
+import { ChevronDown, BookOpen, Plus, Zap, Trophy, Sparkles, Trash2, Edit2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -13,6 +13,7 @@ import { MedicalArea, TopicStatus, EditorialData, EditorialArea, EditorialSubare
 import { AREA_COLORS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
+import { EditorialItem } from '@/hooks/useEditorial';
 
 interface EditorialProps {
   data: EditorialData;
@@ -20,6 +21,12 @@ interface EditorialProps {
   updateTopicStatus: (areaName: string, subareaName: string, topicName: string, status: string) => Promise<void>;
   onAddXP: (xp: number) => void;
   onTabChange: (tab: string) => void;
+  editorials: EditorialItem[];
+  selectedEditorialId: string | null;
+  setSelectedEditorialId: (id: string | null) => void;
+  createEditorial: (name: string) => Promise<string | null>;
+  deleteEditorial: (id: string) => Promise<void>;
+  renameEditorial: (id: string, name: string) => Promise<void>;
 }
 
 const STATUS_CONFIG = {
@@ -49,7 +56,19 @@ const STATUS_CONFIG = {
   }
 };
 
-export default function Editorial({ data: editorialData, setData: setEditorialData, updateTopicStatus, onAddXP, onTabChange }: EditorialProps) {
+export default function Editorial({ 
+  data: editorialData, 
+  setData: setEditorialData, 
+  updateTopicStatus, 
+  onAddXP, 
+  onTabChange,
+  editorials,
+  selectedEditorialId,
+  setSelectedEditorialId,
+  createEditorial,
+  deleteEditorial,
+  renameEditorial
+}: EditorialProps) {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [expandedSubareas, setExpandedSubareas] = useState<Set<string>>(new Set());
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
@@ -60,6 +79,12 @@ export default function Editorial({ data: editorialData, setData: setEditorialDa
   const [newTopicName, setNewTopicName] = useState('');
   const [newSubareaName, setNewSubareaName] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<{ areaId: string; subareaId: string; topicId: string } | null>(null);
+  
+  // New editorial management state
+  const [isCreateEditorialDialogOpen, setIsCreateEditorialDialogOpen] = useState(false);
+  const [newEditorialName, setNewEditorialName] = useState('');
+  const [editingEditorialId, setEditingEditorialId] = useState<string | null>(null);
+  const [editingEditorialName, setEditingEditorialName] = useState('');
 
   const calculateProgress = () => {
     let total = 0;
@@ -249,19 +274,128 @@ export default function Editorial({ data: editorialData, setData: setEditorialDa
     }
   };
 
+  const handleCreateEditorial = async () => {
+    if (!newEditorialName.trim()) {
+      toast({
+        title: "Nome obrigatório",
+        description: "Digite um nome para o edital.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const id = await createEditorial(newEditorialName.trim());
+    if (id) {
+      toast({
+        title: "Edital Criado!",
+        description: `${newEditorialName} foi criado com sucesso.`,
+      });
+      setNewEditorialName('');
+      setIsCreateEditorialDialogOpen(false);
+    }
+  };
+
+  const handleDeleteEditorial = async (id: string) => {
+    if (editorials.length <= 1) {
+      toast({
+        title: "Não é possível excluir",
+        description: "Você precisa ter pelo menos um edital.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    await deleteEditorial(id);
+    toast({
+      title: "Edital Excluído",
+      description: "O edital foi removido com sucesso.",
+    });
+  };
+
+  const handleRenameEditorial = async () => {
+    if (!editingEditorialId || !editingEditorialName.trim()) return;
+
+    await renameEditorial(editingEditorialId, editingEditorialName.trim());
+    toast({
+      title: "Edital Renomeado",
+      description: "O nome do edital foi atualizado.",
+    });
+    setEditingEditorialId(null);
+    setEditingEditorialName('');
+  };
+
   const globalProgress = calculateProgress();
+  const currentEditorialName = editorials.find(e => e.id === selectedEditorialId)?.name || 'CNRM Geral';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Editorial Selector */}
+      <Card className="border-primary/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BookOpen className="w-5 h-5" />
+            Selecionar Edital
+          </CardTitle>
+          <CardDescription>
+            Gerencie múltiplos editais para diferentes bancas ou cursos
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Select value={selectedEditorialId || ''} onValueChange={setSelectedEditorialId}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Selecione um edital" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {editorials.map(ed => (
+                  <SelectItem key={ed.id} value={ed.id}>{ed.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => {
+                if (selectedEditorialId) {
+                  const current = editorials.find(e => e.id === selectedEditorialId);
+                  setEditingEditorialId(selectedEditorialId);
+                  setEditingEditorialName(current?.name || '');
+                }
+              }}
+              title="Renomear edital"
+            >
+              <Edit2 className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => selectedEditorialId && handleDeleteEditorial(selectedEditorialId)}
+              title="Excluir edital"
+              disabled={editorials.length <= 1}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={() => setIsCreateEditorialDialogOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Criar Novo Edital
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Global Progress */}
       <Card className="border-perry-teal dark:border-perry-teal/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-perry-teal">
             <BookOpen className="w-6 h-6" />
-            Progresso Global do Edital
+            Progresso: {currentEditorialName}
           </CardTitle>
           <CardDescription>
-            Você dominou {globalProgress.toFixed(1)}% de todo o conteúdo da Medicina
+            Você dominou {globalProgress.toFixed(1)}% de todo o conteúdo
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -531,6 +665,58 @@ export default function Editorial({ data: editorialData, setData: setEditorialDa
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Create Editorial Dialog */}
+      <Dialog open={isCreateEditorialDialogOpen} onOpenChange={setIsCreateEditorialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Novo Edital</DialogTitle>
+            <DialogDescription>
+              Crie um edital para uma banca específica, curso ou programa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editorial-name">Nome do Edital</Label>
+              <Input
+                id="editorial-name"
+                placeholder="Ex: SES-PE 2024, MEDCURSO, ENADE..."
+                value={newEditorialName}
+                onChange={(e) => setNewEditorialName(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleCreateEditorial} className="w-full">
+              Criar Edital
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Editorial Dialog */}
+      <Dialog open={!!editingEditorialId} onOpenChange={(open) => !open && setEditingEditorialId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Edital</DialogTitle>
+            <DialogDescription>
+              Altere o nome do edital selecionado
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-editorial-name">Novo Nome</Label>
+              <Input
+                id="edit-editorial-name"
+                placeholder="Nome do edital"
+                value={editingEditorialName}
+                onChange={(e) => setEditingEditorialName(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleRenameEditorial} className="w-full">
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
