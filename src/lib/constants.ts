@@ -50,6 +50,7 @@ export const EXAM_INSTITUTIONS = [
   'ENARE',
   'SUS-SP',
   'SUS-RJ',
+  'SES-PE',
   'AMRIGS',
   'IAMSPE',
   'UNICAMP',

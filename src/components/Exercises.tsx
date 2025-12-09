@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, Trash2, PenTool } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ExerciseLog, MedicalArea } from '@/lib/types';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ExerciseLog, MedicalArea, ClassItem } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { getPerformanceColor } from '@/lib/utils';
@@ -14,10 +15,20 @@ interface ExercisesProps {
   exercises: ExerciseLog[];
   addExercise: (exercise: Omit<ExerciseLog, 'id'>) => Promise<void>;
   deleteExercise: (id: string) => Promise<void>;
+  classes?: ClassItem[];
+  onAutoCompleteReview?: (topic: string) => void;
 }
 
-export default function Exercises({ exercises, addExercise, deleteExercise }: ExercisesProps) {
+export default function Exercises({ 
+  exercises, 
+  addExercise, 
+  deleteExercise, 
+  classes = [],
+  onAutoCompleteReview 
+}: ExercisesProps) {
   const isMountedRef = useRef(true);
+  const [topicInputMode, setTopicInputMode] = useState<'manual' | 'class'>('manual');
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [newExercise, setNewExercise] = useState<Partial<ExerciseLog>>({
     date: new Date().toISOString().split('T')[0],
     area: MedicalArea.CLINICA,
@@ -27,10 +38,34 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  // Filter studied classes by selected area
+  const filteredStudiedClasses = useMemo(() => {
+    return classes.filter(c => c.studied && c.area === newExercise.area);
+  }, [classes, newExercise.area]);
+
+  // When area changes, reset class selection
+  useEffect(() => {
+    setSelectedClassId('');
+    if (topicInputMode === 'class') {
+      setNewExercise(prev => ({ ...prev, topic: '' }));
+    }
+  }, [newExercise.area, topicInputMode]);
+
+  // When class is selected, update topic
+  useEffect(() => {
+    if (selectedClassId && topicInputMode === 'class') {
+      const selectedClass = classes.find(c => c.id === selectedClassId);
+      if (selectedClass) {
+        setNewExercise(prev => ({ ...prev, topic: selectedClass.title }));
+      }
+    }
+  }, [selectedClassId, classes, topicInputMode]);
 
   const handleAdd = async () => {
     if (!newExercise.topic?.trim()) {
@@ -76,6 +111,11 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
 
     await addExercise(item);
     
+    // Auto-complete review for this topic if callback provided
+    if (onAutoCompleteReview) {
+      onAutoCompleteReview(item.topic);
+    }
+    
     if (!isMountedRef.current) return;
 
     const accuracy = (item.correctAnswers / item.totalQuestions) * 100;
@@ -91,6 +131,8 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
       totalQuestions: 0,
       correctAnswers: 0
     });
+    setSelectedClassId('');
+    setTopicInputMode('manual');
   };
 
   const handleDelete = async (id: string) => {
@@ -144,18 +186,71 @@ export default function Exercises({ exercises, addExercise, deleteExercise }: Ex
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="topic">Tópico</Label>
-              <Input
-                id="topic"
-                placeholder="Ex: Hipertensão"
-                value={newExercise.topic}
-                onChange={(e) => setNewExercise({ ...newExercise, topic: e.target.value })}
-              />
-            </div>
+            <div className="space-y-2 lg:col-span-3">
+              <Label>Tópico</Label>
+              <div className="space-y-3">
+                <RadioGroup 
+                  value={topicInputMode} 
+                  onValueChange={(v) => {
+                    setTopicInputMode(v as 'manual' | 'class');
+                    if (v === 'manual') {
+                      setSelectedClassId('');
+                      setNewExercise(prev => ({ ...prev, topic: '' }));
+                    }
+                  }}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="manual" id="manual" />
+                    <Label htmlFor="manual" className="cursor-pointer text-sm">Digite manualmente</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="class" id="class" />
+                    <Label htmlFor="class" className="cursor-pointer text-sm">Selecionar de uma aula</Label>
+                  </div>
+                </RadioGroup>
 
+                {topicInputMode === 'manual' ? (
+                  <Input
+                    id="topic"
+                    placeholder="Ex: Hipertensão"
+                    value={newExercise.topic}
+                    onChange={(e) => setNewExercise({ ...newExercise, topic: e.target.value })}
+                  />
+                ) : (
+                  <Select 
+                    value={selectedClassId} 
+                    onValueChange={setSelectedClassId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        filteredStudiedClasses.length === 0 
+                          ? "Nenhuma aula estudada nesta área" 
+                          : "Selecione uma aula estudada"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredStudiedClasses.length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          Nenhuma aula estudada em {newExercise.area}
+                        </SelectItem>
+                      ) : (
+                        filteredStudiedClasses.map(cls => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.title}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="total">Total</Label>
+              <Label htmlFor="total">Total de Questões</Label>
               <Input
                 id="total"
                 type="number"
