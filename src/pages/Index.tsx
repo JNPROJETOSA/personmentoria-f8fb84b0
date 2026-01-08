@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile, Timer, UserCircle } from 'lucide-react';
+import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile, Timer, UserCircle, Shield } from 'lucide-react';
 import Dashboard from '@/components/Dashboard';
 import Analysis from '@/components/Analysis';
 import Classes from '@/components/Classes';
@@ -18,6 +18,7 @@ import Editorial from '@/components/Editorial';
 import XoBurnout from '@/components/XoBurnout';
 import ExamMode from '@/components/ExamMode';
 import ProfileSettings from '@/components/ProfileSettings';
+import AdminDashboard from '@/components/AdminDashboard';
 import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
 import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,8 @@ import { useReviews } from '@/hooks/useReviews';
 import { useEditorial } from '@/hooks/useEditorial';
 import { useBurnout } from '@/hooks/useBurnout';
 import { useExamMode } from '@/hooks/useExamMode';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useAdminData } from '@/hooks/useAdminData';
 
 const AuthenticatedApp = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -55,6 +58,10 @@ const AuthenticatedApp = () => {
   const { editorials, selectedEditorialId, setSelectedEditorialId, editorialData, updateTopicStatus, setEditorialData, createEditorial, deleteEditorial, renameEditorial } = useEditorial(user?.id);
   const { burnoutData, addCheckIn: addBurnoutCheckIn, setBurnoutData, loading: burnoutLoading } = useBurnout(user?.id);
   const { examModeData, addSession: addExamSession, updateMantra, setExamModeData, loading: examModeLoading } = useExamMode(user?.id);
+  
+  // Admin hooks
+  const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
+  const { users: adminUsers, loading: adminLoading } = useAdminData(isAdmin);
 
   // UserProgress from profile
   const userProgress: UserProgress = {
@@ -190,6 +197,7 @@ const AuthenticatedApp = () => {
       case 'xo-burnout': return burnoutLoading ? <div className="text-center py-8">Carregando...</div> : <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
       case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       case 'profile-settings': return <ProfileSettings profile={profile} updateProfile={updateProfile} userEmail={user?.email} />;
+      case 'admin': return <AdminDashboard users={adminUsers} loading={adminLoading} />;
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
     }
   };
@@ -254,6 +262,9 @@ const AuthenticatedApp = () => {
           <div className="my-4 border-t pt-4">
             <p className="px-4 text-xs font-semibold text-muted-foreground uppercase mb-2">Conta</p>
             <NavItem id="profile-settings" label="Informações Pessoais" icon={UserCircle} />
+            {isAdmin && (
+              <NavItem id="admin" label="Administrador" icon={Shield} />
+            )}
           </div>
         </nav>
 
