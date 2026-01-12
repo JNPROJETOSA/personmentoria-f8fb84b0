@@ -180,7 +180,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
       </Card>
 
       {/* Metas da Semana - Tactical HUD Style */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 dark:to-black border-b-4 border-perry-accent p-6">
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 dark:to-black border-b-4 border-brand-accent p-6">
         {/* Background Decoration */}
         <div className="absolute top-0 right-0 -mr-8 -mt-8">
           <BrainCircuit className="w-48 h-48 text-white opacity-10 rotate-12" />
@@ -189,7 +189,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
         {/* Header */}
         <div className="relative z-10 flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Target className="w-6 h-6 text-perry-accent" />
+            <Target className="w-6 h-6 text-brand-accent" />
             <h2 className="text-2xl font-bold text-white">Metas da Semana</h2>
           </div>
           <Button
