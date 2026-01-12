@@ -11,8 +11,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, BookOpen, PenTool, FileText, Trophy, Target, TrendingUp, 
-  TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon
+  TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon, CalendarDays
 } from 'lucide-react';
+import { WeeklyAgenda } from '@/components/WeeklyAgenda';
 import { UserSummary } from '@/hooks/useAdminData';
 import { supabase } from '@/integrations/supabase/client';
 import { MedicalArea } from '@/lib/types';
@@ -592,6 +593,22 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Mentor Agenda Section */}
+      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-primary" />
+            Agenda do Aluno
+          </CardTitle>
+          <CardDescription>
+            Gerencie a agenda semanal e as metas do aluno. As alterações ficam visíveis no dashboard do mentorado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WeeklyAgenda userId={user.user_id} isAdminView={true} />
+        </CardContent>
+      </Card>
 
       {/* Tabs for detailed data */}
       <Tabs defaultValue="areas" className="space-y-4">

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Target, TrendingUp, Calendar, Award, Flame, Zap, Trophy, Activity, BrainCircuit, Edit2, Save } from 'lucide-react';
+import { WeeklyAgenda } from '@/components/WeeklyAgenda';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -328,6 +329,9 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
           </div>
         </div>
       </div>
+
+      {/* Weekly Agenda */}
+      <WeeklyAgenda />
 
       {/* Consistência de Estudos - Activity Garden */}
       <Card>
