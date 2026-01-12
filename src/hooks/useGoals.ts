@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Goals } from '@/lib/types';
 
-export function useGoals(userId: string | undefined) {
+export function useGoals(userId: string | undefined, isAdminView: boolean = false) {
   const [goals, setGoals] = useState<Goals>({
     weeklyQuestions: 50,
     targetAccuracy: 80,
@@ -25,8 +25,10 @@ export function useGoals(userId: string | undefined) {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // No goals found, create default
-          await createDefaultGoals();
+          // No goals found, create default (only if not admin view)
+          if (!isAdminView) {
+            await createDefaultGoals();
+          }
         } else {
           console.error('Error fetching goals:', error);
         }
@@ -56,26 +58,53 @@ export function useGoals(userId: string | undefined) {
     };
 
     fetchGoals();
-  }, [userId]);
+  }, [userId, isAdminView]);
 
   const updateGoals = async (newGoals: Goals) => {
     if (!userId) return;
 
-    const { error } = await supabase
+    // Check if goals exist first
+    const { data: existingGoals } = await supabase
       .from('goals')
-      .update({
-        weekly_questions: newGoals.weeklyQuestions,
-        target_accuracy: newGoals.targetAccuracy,
-        target_topics_per_week: newGoals.targetTopicsPerWeek
-      })
-      .eq('user_id', userId);
+      .select('id')
+      .eq('user_id', userId)
+      .single();
 
-    if (error) {
-      console.error('Error updating goals:', error);
+    if (existingGoals) {
+      // Update existing goals
+      const { error } = await supabase
+        .from('goals')
+        .update({
+          weekly_questions: newGoals.weeklyQuestions,
+          target_accuracy: newGoals.targetAccuracy,
+          target_topics_per_week: newGoals.targetTopicsPerWeek
+        })
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error updating goals:', error);
+        return false;
+      }
     } else {
-      setGoals(newGoals);
+      // Insert new goals (for admin setting goals for a user who doesn't have any)
+      const { error } = await supabase
+        .from('goals')
+        .insert({
+          user_id: userId,
+          weekly_questions: newGoals.weeklyQuestions,
+          target_accuracy: newGoals.targetAccuracy,
+          target_topics_per_week: newGoals.targetTopicsPerWeek
+        });
+
+      if (error) {
+        console.error('Error inserting goals:', error);
+        return false;
+      }
     }
+
+    setGoals(newGoals);
+    return true;
   };
 
-  return { goals, loading, updateGoals };
+  return { goals, loading, updateGoals, setGoals };
 }
