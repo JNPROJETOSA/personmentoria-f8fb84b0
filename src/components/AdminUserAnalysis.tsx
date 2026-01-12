@@ -378,70 +378,67 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           yPosition = 20;
         }
 
-        // Main exams summary
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Data', 'Prova', 'Instituição', 'Acertos', 'Total', 'Aproveitamento']],
-          body: filteredExams.map(exam => {
-            const perf = exam.performance as any || {};
-            const totalQ = perf.totalQuestions || 0;
-            const totalC = perf.correctAnswers || 0;
-            const acc = totalQ > 0 ? ((totalC / totalQ) * 100).toFixed(1) : '-';
-            return [
-              new Date(exam.date).toLocaleDateString('pt-BR'),
-              exam.name,
-              exam.institution,
-              totalC.toString(),
-              totalQ.toString(),
-              totalQ > 0 ? `${acc}%` : '-'
-            ];
-          }),
-          theme: 'grid',
-          headStyles: {
-            fillColor: slateHeader,
-            textColor: 255,
-            fontSize: 10,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: { fontSize: 9, cellPadding: 4 },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 22 },
-            1: { halign: 'left' },
-            2: { halign: 'left', cellWidth: 35 },
-            3: { halign: 'center', cellWidth: 18 },
-            4: { halign: 'center', cellWidth: 15 },
-            5: { halign: 'center', fontStyle: 'bold', cellWidth: 25 }
-          }
-        });
-        yPosition = (pdf as any).lastAutoTable.finalY + 8;
+        // Section title
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(slateHeader[0], slateHeader[1], slateHeader[2]);
+        pdf.text('PROVAS E SIMULADOS REALIZADOS', 14, yPosition);
+        yPosition += 8;
 
-        // Detailed breakdown per exam by area
+        // Loop through each exam and show details
         for (const exam of filteredExams) {
+          if (yPosition > pageHeight - 80) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+
           const perf = exam.performance as any || {};
+          const totalQ = perf.totalQuestions || 0;
+          const totalC = perf.correctAnswers || 0;
           const areaDetails = perf.areaDetails || [];
-          
+          const acc = totalQ > 0 ? ((totalC / totalQ) * 100).toFixed(1) : '0';
+
+          // Exam header card
+          pdf.setFillColor(248, 250, 252);
+          pdf.roundedRect(14, yPosition, pageWidth - 28, 18, 2, 2, 'F');
+          pdf.setDrawColor(200, 200, 200);
+          pdf.roundedRect(14, yPosition, pageWidth - 28, 18, 2, 2, 'S');
+
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(30, 41, 59);
+          pdf.text(exam.name, 18, yPosition + 7);
+
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(`${exam.institution} • ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 18, yPosition + 14);
+
+          // Score on the right
+          pdf.setFontSize(12);
+          pdf.setFont('helvetica', 'bold');
+          const accNum = parseFloat(acc);
+          if (accNum >= 70) pdf.setTextColor(16, 185, 129);
+          else if (accNum >= 50) pdf.setTextColor(245, 158, 11);
+          else pdf.setTextColor(239, 68, 68);
+          pdf.text(`${totalC}/${totalQ} (${acc}%)`, pageWidth - 18, yPosition + 10, { align: 'right' });
+
+          yPosition += 22;
+
+          // Area details table for this exam
           if (areaDetails.length > 0) {
-            if (yPosition > pageHeight - 50) {
-              pdf.addPage();
-              yPosition = 20;
-            }
-
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'bold');
-            pdf.setTextColor(50, 50, 50);
-            pdf.text(`${exam.name} - Detalhamento por Área`, 14, yPosition);
-            yPosition += 5;
-
             autoTable(pdf, {
               startY: yPosition,
               head: [['Área Médica', 'Acertos', 'Total', 'Aproveitamento']],
-              body: areaDetails.map((ad: any) => [
-                ad.area,
-                ad.correct.toString(),
-                ad.total.toString(),
-                ad.total > 0 ? `${((ad.correct / ad.total) * 100).toFixed(1)}%` : '-'
-              ]),
+              body: areaDetails.map((ad: any) => {
+                const areaAcc = ad.total > 0 ? ((ad.correct / ad.total) * 100).toFixed(1) : '0';
+                return [
+                  ad.area,
+                  ad.correct.toString(),
+                  ad.total.toString(),
+                  `${areaAcc}%`
+                ];
+              }),
               theme: 'striped',
               headStyles: {
                 fillColor: [100, 116, 139],
@@ -452,13 +449,16 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
               },
               styles: { fontSize: 8, cellPadding: 3 },
               columnStyles: {
-                0: { halign: 'left', fontStyle: 'bold' },
-                1: { halign: 'center' },
-                2: { halign: 'center' },
-                3: { halign: 'center', fontStyle: 'bold' }
-              }
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: 60 },
+                1: { halign: 'center', cellWidth: 25 },
+                2: { halign: 'center', cellWidth: 25 },
+                3: { halign: 'center', fontStyle: 'bold', cellWidth: 30 }
+              },
+              margin: { left: 14, right: 14 }
             });
-            yPosition = (pdf as any).lastAutoTable.finalY + 8;
+            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+          } else {
+            yPosition += 5;
           }
         }
       }
