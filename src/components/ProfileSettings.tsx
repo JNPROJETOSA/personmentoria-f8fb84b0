@@ -160,7 +160,7 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
             <span className="font-semibold">{(profile as any)?.xp || 0}</span>
           </div>
           <div className="flex justify-between items-center py-2 border-b">
-            <span className="text-sm text-muted-foreground">Streak</span>
+            <span className="text-sm text-muted-foreground">Sequência de Estudos</span>
             <span className="font-semibold">{(profile as any)?.streak || 0} dias</span>
           </div>
           <div className="flex justify-between items-center py-2">

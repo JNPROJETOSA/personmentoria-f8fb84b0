@@ -296,7 +296,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       // Gamification stats
       pdf.setFontSize(9);
       pdf.setTextColor(100, 100, 100);
-      pdf.text(`Nível: ${user.level}  |  XP: ${user.xp}  |  Streak: ${user.streak} dias`, kpiX, yPosition + 35);
+      pdf.text(`Nível: ${user.level}  |  XP: ${user.xp}  |  Sequência: ${user.streak} dias`, kpiX, yPosition + 35);
 
       yPosition += 50;
 

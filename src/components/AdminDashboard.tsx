@@ -119,7 +119,7 @@ const AdminDashboard = ({ users, loading }: AdminDashboardProps) => {
                 <TableHead className="text-center">
                   <span className="flex items-center justify-center gap-1">
                     <Flame className="w-4 h-4 text-orange-500" />
-                    Streak
+                    Sequência
                   </span>
                 </TableHead>
                 <TableHead className="text-center">Exercícios</TableHead>

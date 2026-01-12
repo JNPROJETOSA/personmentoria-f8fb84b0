@@ -110,7 +110,7 @@ function buildContextPrompt(userData: any): string {
 - Nome: ${profile.name}
 - Nível: ${profile.level}
 - XP Total: ${profile.xp}
-- Streak: ${profile.streak} dias consecutivos\n\n`;
+- Sequência: ${profile.streak} dias consecutivos\n\n`;
   }
 
   // Exercises analysis
