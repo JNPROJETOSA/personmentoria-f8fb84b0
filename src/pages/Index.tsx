@@ -226,7 +226,7 @@ const AuthenticatedApp = () => {
         <div className="p-6 border-b flex justify-between items-center">
           <div className="flex items-center gap-2">
             <BrainCircuit size={32} className="text-primary" strokeWidth={2.5} />
-            <h1 className="text-xl font-extrabold">PERRY<span className="text-primary">MED</span></h1>
+            <h1 className="text-xl font-extrabold">PERSON<span className="text-primary"> MENTORIA</span></h1>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
             <X size={24} />
@@ -256,7 +256,7 @@ const AuthenticatedApp = () => {
           
           <div className="my-4 border-t pt-4">
             <p className="px-4 text-xs font-semibold text-muted-foreground uppercase mb-2">Assistente</p>
-            <NavItem id="ai-tutor" label="Tutor PERRY" icon={BrainCircuit} />
+            <NavItem id="ai-tutor" label="TUTOR PERSON" icon={BrainCircuit} />
           </div>
 
           <div className="my-4 border-t pt-4">
