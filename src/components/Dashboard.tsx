@@ -225,7 +225,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-white/70">Questões por Semana</span>
-              <Zap className="w-5 h-5 text-perry-accent" />
+              <Zap className="w-5 h-5 text-brand-accent" />
             </div>
             
             {isEditingGoals ? (
@@ -250,7 +250,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
 
             <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
               <div 
-                className="absolute inset-y-0 left-0 bg-perry-accent rounded-full transition-all duration-500"
+                className="absolute inset-y-0 left-0 bg-brand-accent rounded-full transition-all duration-500"
                 style={{ width: `${Math.min((weeklyQuestions / goals.weeklyQuestions) * 100, 100)}%` }}
               />
             </div>
@@ -286,7 +286,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
               <div 
                 className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-                  weeklyAccuracy >= goals.targetAccuracy ? 'bg-perry-teal' : 'bg-yellow-500'
+                  weeklyAccuracy >= goals.targetAccuracy ? 'bg-brand-teal' : 'bg-yellow-500'
                 }`}
                 style={{ width: `${Math.min(weeklyAccuracy, 100)}%` }}
               />
@@ -337,7 +337,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-perry-teal" />
+            <Activity className="w-5 h-5 text-brand-teal" />
             Consistência de Estudos
           </CardTitle>
           <CardDescription>Últimos 6 meses - Não deixe buracos cinzas no seu jardim!</CardDescription>
@@ -348,14 +348,14 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               {heatmapData.map((day, i) => {
                 let color = 'bg-slate-100 dark:bg-slate-800';
                 if (day.count > 0) {
-                  if (day.count >= 50) color = 'bg-perry-teal';
+                  if (day.count >= 50) color = 'bg-brand-teal';
                   else if (day.count >= 11) color = 'bg-teal-300';
                   else if (day.count >= 1) color = 'bg-teal-200';
                 }
                 return (
                   <div
                     key={i}
-                    className={`w-3 h-3 md:w-4 md:h-4 rounded-sm ${color} hover:ring-2 hover:ring-perry-accent transition-all cursor-pointer relative group`}
+                    className={`w-3 h-3 md:w-4 md:h-4 rounded-sm ${color} hover:ring-2 hover:ring-brand-accent transition-all cursor-pointer relative group`}
                     title={`${day.date}: ${day.count} questões`}
                   >
                     {/* Tooltip */}
@@ -375,7 +375,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
                 <div className="w-4 h-4 rounded-sm bg-slate-100 dark:bg-slate-800 border border-border" title="Sem estudo" />
                 <div className="w-4 h-4 rounded-sm bg-teal-200" title="1-10 questões" />
                 <div className="w-4 h-4 rounded-sm bg-teal-300" title="11-30 questões" />
-                <div className="w-4 h-4 rounded-sm bg-perry-teal" title="50+ questões (Meta batida!)" />
+                <div className="w-4 h-4 rounded-sm bg-brand-teal" title="50+ questões (Meta batida!)" />
               </div>
               <span className="font-medium">Mais</span>
             </div>
