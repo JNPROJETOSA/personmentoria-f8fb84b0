@@ -234,7 +234,7 @@ const AuthenticatedApp = () => {
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
+          <NavItem id="dashboard" label="Painel" icon={LayoutDashboard} />
           <NavItem id="editorial" label="Edital" icon={ScrollText} />
           <NavItem id="notebook" label="Caderno de Erros" icon={Book} />
           <NavItem id="analysis" label="Análise Geral" icon={PieChart} />
