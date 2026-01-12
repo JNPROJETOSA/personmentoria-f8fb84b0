@@ -11,12 +11,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, BookOpen, PenTool, FileText, Trophy, Target, TrendingUp, 
-  TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon, CalendarDays
+  TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon, CalendarDays, Save, Settings
 } from 'lucide-react';
 import { WeeklyAgenda } from '@/components/WeeklyAgenda';
 import { UserSummary } from '@/hooks/useAdminData';
+import { useGoals } from '@/hooks/useGoals';
 import { supabase } from '@/integrations/supabase/client';
-import { MedicalArea } from '@/lib/types';
+import { MedicalArea, ExamLog } from '@/lib/types';
 import { getPerformanceColor } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -47,6 +48,26 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
     return date.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Goals management for admin
+  const { goals, loading: goalsLoading, updateGoals } = useGoals(user.user_id, true);
+  const [editGoals, setEditGoals] = useState({
+    weeklyQuestions: 50,
+    targetAccuracy: 80,
+    targetTopicsPerWeek: 5
+  });
+  const [savingGoals, setSavingGoals] = useState(false);
+
+  // Sync editGoals when goals are loaded
+  useEffect(() => {
+    if (!goalsLoading) {
+      setEditGoals({
+        weeklyQuestions: goals.weeklyQuestions,
+        targetAccuracy: goals.targetAccuracy,
+        targetTopicsPerWeek: goals.targetTopicsPerWeek
+      });
+    }
+  }, [goals, goalsLoading]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -80,6 +101,26 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
 
     fetchUserData();
   }, [user.user_id]);
+
+  // Handle saving goals
+  const handleSaveGoals = async () => {
+    setSavingGoals(true);
+    const success = await updateGoals(editGoals);
+    setSavingGoals(false);
+    
+    if (success) {
+      toast({
+        title: "Metas atualizadas!",
+        description: `As metas de ${user.name} foram salvas com sucesso.`,
+      });
+    } else {
+      toast({
+        title: "Erro ao salvar metas",
+        description: "Não foi possível atualizar as metas do aluno.",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (loading || !data) {
     return (
@@ -330,28 +371,31 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
         yPosition = (pdf as any).lastAutoTable.finalY + 10;
       }
 
-      // Exams Table
+      // Exams Table with detailed breakdown
       if (filteredExams.length > 0) {
         if (yPosition > pageHeight - 60) {
           pdf.addPage();
           yPosition = 20;
         }
 
+        // Main exams summary
         autoTable(pdf, {
           startY: yPosition,
-          head: [['Data', 'Prova', 'Instituição', 'Desempenho']],
-                  body: filteredExams.map(exam => {
-                    const performance = (exam.performance || {}) as Record<string, { total?: number; correct?: number }>;
-                    const totalQ = Object.values(performance).reduce((sum: number, p) => sum + (p?.total || 0), 0);
-                    const totalC = Object.values(performance).reduce((sum: number, p) => sum + (p?.correct || 0), 0);
-                    const acc = totalQ > 0 ? ((totalC / totalQ) * 100).toFixed(1) : '-';
-                    return [
-                      new Date(exam.date).toLocaleDateString('pt-BR'),
-                      exam.name,
-                      exam.institution,
-                      totalQ > 0 ? `${totalC}/${totalQ} (${acc}%)` : '-'
-                    ];
-                  }),
+          head: [['Data', 'Prova', 'Instituição', 'Acertos', 'Total', 'Aproveitamento']],
+          body: filteredExams.map(exam => {
+            const perf = exam.performance as any || {};
+            const totalQ = perf.totalQuestions || 0;
+            const totalC = perf.correctAnswers || 0;
+            const acc = totalQ > 0 ? ((totalC / totalQ) * 100).toFixed(1) : '-';
+            return [
+              new Date(exam.date).toLocaleDateString('pt-BR'),
+              exam.name,
+              exam.institution,
+              totalC.toString(),
+              totalQ.toString(),
+              totalQ > 0 ? `${acc}%` : '-'
+            ];
+          }),
           theme: 'grid',
           headStyles: {
             fillColor: slateHeader,
@@ -362,13 +406,61 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           },
           styles: { fontSize: 9, cellPadding: 4 },
           columnStyles: {
-            0: { halign: 'center', cellWidth: 25 },
+            0: { halign: 'center', cellWidth: 22 },
             1: { halign: 'left' },
-            2: { halign: 'left', cellWidth: 40 },
-            3: { halign: 'center', fontStyle: 'bold', cellWidth: 35 }
+            2: { halign: 'left', cellWidth: 35 },
+            3: { halign: 'center', cellWidth: 18 },
+            4: { halign: 'center', cellWidth: 15 },
+            5: { halign: 'center', fontStyle: 'bold', cellWidth: 25 }
           }
         });
-        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        yPosition = (pdf as any).lastAutoTable.finalY + 8;
+
+        // Detailed breakdown per exam by area
+        for (const exam of filteredExams) {
+          const perf = exam.performance as any || {};
+          const areaDetails = perf.areaDetails || [];
+          
+          if (areaDetails.length > 0) {
+            if (yPosition > pageHeight - 50) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(50, 50, 50);
+            pdf.text(`${exam.name} - Detalhamento por Área`, 14, yPosition);
+            yPosition += 5;
+
+            autoTable(pdf, {
+              startY: yPosition,
+              head: [['Área Médica', 'Acertos', 'Total', 'Aproveitamento']],
+              body: areaDetails.map((ad: any) => [
+                ad.area,
+                ad.correct.toString(),
+                ad.total.toString(),
+                ad.total > 0 ? `${((ad.correct / ad.total) * 100).toFixed(1)}%` : '-'
+              ]),
+              theme: 'striped',
+              headStyles: {
+                fillColor: [100, 116, 139],
+                textColor: 255,
+                fontSize: 9,
+                fontStyle: 'bold',
+                halign: 'center'
+              },
+              styles: { fontSize: 8, cellPadding: 3 },
+              columnStyles: {
+                0: { halign: 'left', fontStyle: 'bold' },
+                1: { halign: 'center' },
+                2: { halign: 'center' },
+                3: { halign: 'center', fontStyle: 'bold' }
+              }
+            });
+            yPosition = (pdf as any).lastAutoTable.finalY + 8;
+          }
+        }
       }
 
       // Classes Table
@@ -594,6 +686,58 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
         </Card>
       </div>
 
+      {/* Goals Management Section */}
+      <Card className="border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-amber-500" />
+            Metas do Aluno
+          </CardTitle>
+          <CardDescription>
+            Defina as metas semanais do aluno. Essas metas aparecerão no dashboard do mentorado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="weeklyQuestions">Questões por Semana</Label>
+              <Input
+                id="weeklyQuestions"
+                type="number"
+                min={0}
+                value={editGoals.weeklyQuestions}
+                onChange={(e) => setEditGoals({ ...editGoals, weeklyQuestions: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="targetAccuracy">Meta de Acerto (%)</Label>
+              <Input
+                id="targetAccuracy"
+                type="number"
+                min={0}
+                max={100}
+                value={editGoals.targetAccuracy}
+                onChange={(e) => setEditGoals({ ...editGoals, targetAccuracy: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="targetTopics">Temas por Semana</Label>
+              <Input
+                id="targetTopics"
+                type="number"
+                min={0}
+                value={editGoals.targetTopicsPerWeek}
+                onChange={(e) => setEditGoals({ ...editGoals, targetTopicsPerWeek: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
+          <Button onClick={handleSaveGoals} disabled={savingGoals} className="gap-2">
+            <Save className="w-4 h-4" />
+            {savingGoals ? 'Salvando...' : 'Salvar Metas'}
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Mentor Agenda Section */}
       <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-card">
         <CardHeader>
@@ -602,7 +746,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
             Agenda do Aluno
           </CardTitle>
           <CardDescription>
-            Gerencie a agenda semanal e as metas do aluno. As alterações ficam visíveis no dashboard do mentorado.
+            Gerencie a agenda semanal do aluno. As alterações ficam visíveis no dashboard do mentorado.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -723,9 +867,10 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
               {filteredExams.length > 0 ? (
                 <Accordion type="single" collapsible className="space-y-2">
                   {filteredExams.map((exam) => {
-                    const performance = (exam.performance || {}) as Record<string, { total?: number; correct?: number }>;
-                    const totalQ = Object.values(performance).reduce((sum: number, p) => sum + (p?.total || 0), 0);
-                    const totalC = Object.values(performance).reduce((sum: number, p) => sum + (p?.correct || 0), 0);
+                    const perf = exam.performance as any || {};
+                    const totalQ = perf.totalQuestions || 0;
+                    const totalC = perf.correctAnswers || 0;
+                    const areaDetails = perf.areaDetails || [];
                     const examAcc = totalQ > 0 ? (totalC / totalQ) * 100 : 0;
 
                     return (
@@ -746,22 +891,26 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
                           </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                          {Object.entries(performance).length > 0 ? (
+                          {areaDetails.length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-                              {Object.entries(performance).map(([area, perf]) => (
-                                <div key={area} className="p-3 bg-muted rounded-lg">
-                                  <p className="font-medium text-sm">{area}</p>
+                              {areaDetails.map((ad: any, idx: number) => (
+                                <div key={`${ad.area}-${idx}`} className="p-3 bg-muted rounded-lg">
+                                  <p className="font-medium text-sm">{ad.area}</p>
                                   <p className="text-lg font-bold">
-                                    {perf?.correct || 0}/{perf?.total || 0}
+                                    {ad.correct || 0}/{ad.total || 0}
                                     <span className="text-sm font-normal text-muted-foreground ml-1">
-                                      ({(perf?.total || 0) > 0 ? (((perf?.correct || 0) / (perf?.total || 1)) * 100).toFixed(0) : 0}%)
+                                      ({(ad.total || 0) > 0 ? (((ad.correct || 0) / (ad.total || 1)) * 100).toFixed(0) : 0}%)
                                     </span>
                                   </p>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-muted-foreground text-sm">Sem detalhes disponíveis</p>
+                            <div className="pt-2">
+                              <p className="text-muted-foreground text-sm">
+                                Total: {totalC}/{totalQ} questões ({totalQ > 0 ? examAcc.toFixed(1) : 0}%)
+                              </p>
+                            </div>
                           )}
                         </AccordionContent>
                       </AccordionItem>
