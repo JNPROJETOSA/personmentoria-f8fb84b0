@@ -158,7 +158,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('PERRYMED - Boletim de Desempenho', 105, 12, { align: 'center' });
+      doc.text('PERSON MENTORIA - Boletim de Desempenho', 105, 12, { align: 'center' });
       
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');

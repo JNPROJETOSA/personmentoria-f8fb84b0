@@ -64,7 +64,7 @@ export default {
           clinica: "hsl(var(--medical-clinica))",
           cirurgia: "hsl(var(--medical-cirurgia))",
         },
-        perry: {
+        brand: {
           teal: "#0d9488",
           accent: "#f97316",
         },

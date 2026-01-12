@@ -87,7 +87,7 @@ export default function Auth() {
 
         toast({
           title: "Login realizado!",
-          description: "Bem-vindo de volta ao PERRYMED.",
+          description: "Bem-vindo de volta ao PERSON MENTORIA.",
         });
         navigate("/");
       } else {
@@ -145,7 +145,7 @@ export default function Auth() {
             </div>
           </div>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-500 bg-clip-text text-transparent">
-            PERRYMED
+            PERSON MENTORIA
           </CardTitle>
           <CardDescription>
             {isResetPassword

@@ -17,8 +17,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 27%;
 
-    /* Perry Brand Colors */
-    --primary: 173 58% 39%; /* Perry Teal #0d9488 */
+    /* Brand Colors */
+    --primary: 173 58% 39%; /* Teal #0d9488 */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 214 32% 91%;
@@ -27,7 +27,7 @@ All colors MUST be HSL.
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 25 95% 53%; /* Perry Accent Orange #f97316 */
+    --accent: 25 95% 53%; /* Accent Orange #f97316 */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -64,7 +64,7 @@ All colors MUST be HSL.
     --heatmap-empty: 210 40% 96%; /* Slate-100 */
     --heatmap-low: 173 76% 70%; /* Teal-200 */
     --heatmap-medium: 173 58% 50%; /* Teal-400 */
-    --heatmap-high: 173 58% 39%; /* Teal-600 Perry Teal */
+    --heatmap-high: 173 58% 39%; /* Teal-600 */
 
     /* Charts and data viz */
     --chart-1: 217 91% 60%;
@@ -84,7 +84,7 @@ All colors MUST be HSL.
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 96%;
 
-    /* Perry Brand Colors (same in dark) */
+    /* Brand Colors (same in dark) */
     --primary: 173 58% 39%;
     --primary-foreground: 0 0% 100%;
 
