@@ -6,6 +6,7 @@ export interface DayAgenda {
   id?: string;
   dayOfWeek: number;
   tasks: string[];
+  completedIndices: number[];
 }
 
 export interface WeeklyAgendaData {
@@ -51,7 +52,8 @@ export function useWeeklyAgenda(userId?: string) {
         days.push({
           id: dayData?.id,
           dayOfWeek: i,
-          tasks: dayData?.tasks || []
+          tasks: dayData?.tasks || [],
+          completedIndices: (dayData as any)?.completed_indices || []
         });
       }
 
@@ -63,7 +65,7 @@ export function useWeeklyAgenda(userId?: string) {
     }
   }, [getWeekStart, userId]);
 
-  const updateDayTasks = useCallback(async (dayOfWeek: number, tasks: string[]) => {
+  const updateDayTasks = useCallback(async (dayOfWeek: number, tasks: string[], completedIndices?: number[]) => {
     try {
       const weekStart = getWeekStart();
       
@@ -74,14 +76,20 @@ export function useWeeklyAgenda(userId?: string) {
         targetUserId = user.id;
       }
 
+      const updateData: any = {
+        user_id: targetUserId,
+        week_start: weekStart,
+        day_of_week: dayOfWeek,
+        tasks
+      };
+
+      if (completedIndices !== undefined) {
+        updateData.completed_indices = completedIndices;
+      }
+
       const { error } = await supabase
         .from('weekly_agenda')
-        .upsert({
-          user_id: targetUserId,
-          week_start: weekStart,
-          day_of_week: dayOfWeek,
-          tasks
-        }, {
+        .upsert(updateData, {
           onConflict: 'user_id,week_start,day_of_week'
         });
 
@@ -94,7 +102,9 @@ export function useWeeklyAgenda(userId?: string) {
       setAgenda(prev => {
         if (!prev) return prev;
         const newDays = prev.days.map(d => 
-          d.dayOfWeek === dayOfWeek ? { ...d, tasks } : d
+          d.dayOfWeek === dayOfWeek 
+            ? { ...d, tasks, completedIndices: completedIndices ?? d.completedIndices } 
+            : d
         );
         return { ...prev, days: newDays };
       });
@@ -103,9 +113,25 @@ export function useWeeklyAgenda(userId?: string) {
     }
   }, [getWeekStart, userId]);
 
+  const toggleTaskCompletion = useCallback(async (dayOfWeek: number, taskIndex: number) => {
+    if (!agenda) return;
+    
+    const dayAgenda = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
+    if (!dayAgenda) return;
+    
+    const currentCompleted = dayAgenda.completedIndices || [];
+    const isCompleted = currentCompleted.includes(taskIndex);
+    
+    const newCompleted = isCompleted
+      ? currentCompleted.filter(i => i !== taskIndex)
+      : [...currentCompleted, taskIndex];
+    
+    await updateDayTasks(dayOfWeek, dayAgenda.tasks, newCompleted);
+  }, [agenda, updateDayTasks]);
+
   useEffect(() => {
     fetchAgenda();
   }, [fetchAgenda]);
 
-  return { agenda, loading, updateDayTasks, refetch: fetchAgenda };
+  return { agenda, loading, updateDayTasks, toggleTaskCompletion, refetch: fetchAgenda };
 }
