@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Plus, X, Edit2, Check, Trash2 } from 'lucide-react';
 import { useWeeklyAgenda } from '@/hooks/useWeeklyAgenda';
 import { format, addDays, startOfWeek } from 'date-fns';
@@ -15,7 +16,7 @@ interface WeeklyAgendaProps {
 }
 
 export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps) {
-  const { agenda, loading, updateDayTasks } = useWeeklyAgenda(userId);
+  const { agenda, loading, updateDayTasks, toggleTaskCompletion } = useWeeklyAgenda(userId);
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [newTask, setNewTask] = useState('');
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
@@ -38,8 +39,13 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
     
     const dayAgenda = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
     const currentTasks = dayAgenda?.tasks || [];
+    const currentCompleted = dayAgenda?.completedIndices || [];
     const newTasks = currentTasks.filter((_, i) => i !== taskIndex);
-    await updateDayTasks(dayOfWeek, newTasks);
+    // Adjust completed indices after removal
+    const newCompleted = currentCompleted
+      .filter(i => i !== taskIndex)
+      .map(i => i > taskIndex ? i - 1 : i);
+    await updateDayTasks(dayOfWeek, newTasks, newCompleted);
   };
 
   const handleEditTask = async (dayOfWeek: number, taskIndex: number) => {
@@ -137,60 +143,73 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                     <p className="text-sm text-slate-400 italic">Nenhuma tarefa</p>
                   )}
                   
-                  {day.tasks.map((task, taskIndex) => (
-                    <div
-                      key={taskIndex}
-                      className="flex items-start gap-2 group"
-                    >
-                      {editingTaskIndex === taskIndex && isEditing ? (
-                        <div className="flex items-center gap-2 flex-1">
-                          <Input
-                            value={editingTaskValue}
-                            onChange={(e) => setEditingTaskValue(e.target.value)}
-                            className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleEditTask(day.dayOfWeek, taskIndex);
-                              if (e.key === 'Escape') setEditingTaskIndex(null);
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-green-400 hover:text-green-300 hover:bg-green-400/10"
-                            onClick={() => handleEditTask(day.dayOfWeek, taskIndex)}
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <span className="text-sm text-white leading-relaxed flex-1 break-words whitespace-normal">
-                            • {task}
-                          </span>
-                          {isEditing && (
-                            <div className="flex gap-1 shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-slate-300 hover:text-white hover:bg-white/10"
-                                onClick={() => startEditingTask(taskIndex, task)}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-slate-300 hover:text-red-400 hover:bg-red-400/10"
-                                onClick={() => handleRemoveTask(day.dayOfWeek, taskIndex)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  ))}
+                  {day.tasks.map((task, taskIndex) => {
+                    const isCompleted = day.completedIndices?.includes(taskIndex);
+                    
+                    return (
+                      <div
+                        key={taskIndex}
+                        className="flex items-start gap-2 group"
+                      >
+                        {editingTaskIndex === taskIndex && isEditing ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              value={editingTaskValue}
+                              onChange={(e) => setEditingTaskValue(e.target.value)}
+                              className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleEditTask(day.dayOfWeek, taskIndex);
+                                if (e.key === 'Escape') setEditingTaskIndex(null);
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-green-400 hover:text-green-300 hover:bg-green-400/10"
+                              onClick={() => handleEditTask(day.dayOfWeek, taskIndex)}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            {!isAdminView && (
+                              <Checkbox
+                                checked={isCompleted}
+                                onCheckedChange={() => toggleTaskCompletion(day.dayOfWeek, taskIndex)}
+                                className="mt-0.5 border-slate-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              />
+                            )}
+                            <span className={`text-sm leading-relaxed flex-1 break-words whitespace-normal ${
+                              isCompleted ? 'text-slate-400 line-through' : 'text-white'
+                            }`}>
+                              {isAdminView && '• '}{task}
+                            </span>
+                            {isEditing && (
+                              <div className="flex gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-slate-300 hover:text-white hover:bg-white/10"
+                                  onClick={() => startEditingTask(taskIndex, task)}
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-slate-300 hover:text-red-400 hover:bg-red-400/10"
+                                  onClick={() => handleRemoveTask(day.dayOfWeek, taskIndex)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
 
                   {isEditing && (
                     <div className="flex items-center gap-2 mt-3">

@@ -489,6 +489,7 @@ export type Database = {
       }
       weekly_agenda: {
         Row: {
+          completed_indices: number[] | null
           created_at: string
           day_of_week: number
           id: string
@@ -498,6 +499,7 @@ export type Database = {
           week_start: string
         }
         Insert: {
+          completed_indices?: number[] | null
           created_at?: string
           day_of_week: number
           id?: string
@@ -507,6 +509,7 @@ export type Database = {
           week_start: string
         }
         Update: {
+          completed_indices?: number[] | null
           created_at?: string
           day_of_week?: number
           id?: string
