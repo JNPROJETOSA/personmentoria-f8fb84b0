@@ -24,7 +24,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Olá! Sou o **TUTOR PERSON** 🎓, seu assistente de estudos para residência médica. \n\nPosso te ajudar com:\n- 📊 Análise do seu desempenho\n- 💡 Sugestões de estudo personalizadas\n- 📚 Dúvidas sobre temas médicos\n- 🎯 Estratégias de revisão\n\nComo posso te ajudar hoje?'
+      content: 'Olá! Sou o **TUTOR REGIS** 🎓, seu assistente de estudos para residência médica. \n\nPosso te ajudar com:\n- 📊 Análise do seu desempenho\n- 💡 Sugestões de estudo personalizadas\n- 📚 Dúvidas sobre temas médicos\n- 🎯 Estratégias de revisão\n\nComo posso te ajudar hoje?'
     }
   ]);
   const [input, setInput] = useState('');
@@ -81,7 +81,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
         if (response.status === 402) {
           throw new Error('Créditos insuficientes. Adicione créditos ao workspace.');
         }
-        throw new Error('Erro ao comunicar com TUTOR PERSON');
+        throw new Error('Erro ao comunicar com TUTOR REGIS');
       }
 
       if (!response.body) {
@@ -143,7 +143,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
     } catch (error) {
       console.error('Error:', error);
       toast({
-        title: 'Erro ao conversar com TUTOR PERSON',
+        title: 'Erro ao conversar com TUTOR REGIS',
         description: error instanceof Error ? error.message : 'Tente novamente em alguns instantes.',
         variant: 'destructive',
       });
@@ -174,7 +174,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BrainCircuit className="w-5 h-5 text-primary" />
-            TUTOR PERSON
+            TUTOR REGIS
           </CardTitle>
           <CardDescription>
             Assistente inteligente com IA especializado em residência médica
@@ -198,7 +198,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
                     {message.role === 'assistant' && (
                       <div className="flex items-center gap-2 mb-2">
                         <BrainCircuit className="w-4 h-4" />
-                        <span className="text-xs font-semibold">TUTOR PERSON</span>
+                        <span className="text-xs font-semibold">TUTOR REGIS</span>
                       </div>
                     )}
                     {message.role === 'assistant' ? (

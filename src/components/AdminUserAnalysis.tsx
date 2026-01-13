@@ -218,7 +218,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           pdf.setFontSize(8);
           pdf.setTextColor(150, 150, 150);
           pdf.text(
-            `Gerado em ${new Date().toLocaleString('pt-BR')} via PERSON MENTORIA - Página ${i} de ${pageCount}`,
+            `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
             pageWidth / 2,
             pageHeight - 10,
             { align: 'center' }
@@ -233,7 +233,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(255, 255, 255);
-      pdf.text('PERSON MENTORIA - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
+      pdf.text('Mentoria Regisdência - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
       
       pdf.setFontSize(14);
       pdf.text(`Aluno: ${user.name}`, pageWidth / 2, 21, { align: 'center' });

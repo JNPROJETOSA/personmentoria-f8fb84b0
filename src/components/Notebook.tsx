@@ -101,7 +101,7 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(255, 255, 255);
-      pdf.text('PERSON MENTORIA - Caderno de Erros', pageWidth / 2, 15, { align: 'center' });
+      pdf.text('Mentoria Regisdência - Caderno de Erros', pageWidth / 2, 15, { align: 'center' });
       
       let yPosition = 40;
       
@@ -155,14 +155,14 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
         pdf.setFontSize(8);
         pdf.setTextColor(150, 150, 150);
         pdf.text(
-          `Gerado em ${new Date().toLocaleString('pt-BR')} via PERSON MENTORIA - Página ${i} de ${pageCount}`,
+          `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
           pageWidth / 2,
           pageHeight - 10,
           { align: 'center' }
         );
       }
       
-      pdf.save(`PERSON_MENTORIA_Caderno_de_Erros_${new Date().toISOString().split('T')[0]}.pdf`);
+      pdf.save(`Mentoria_Regisdencia_Caderno_de_Erros_${new Date().toISOString().split('T')[0]}.pdf`);
       
       toast({
         title: "PDF gerado com sucesso!",

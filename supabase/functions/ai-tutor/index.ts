@@ -32,7 +32,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `Você é o TUTOR PERSON, um assistente de estudos especializado em preparação para residência médica no Brasil.
+            content: `Você é o TUTOR REGIS, um assistente de estudos especializado em preparação para residência médica no Brasil.
 
 CONTEXTO DO ESTUDANTE:
 ${contextPrompt}
@@ -81,7 +81,7 @@ FORMATO DE RESPOSTA:
       
       const errorText = await response.text();
       console.error('AI Gateway error:', response.status, errorText);
-      throw new Error('Erro ao comunicar com o TUTOR PERSON');
+      throw new Error('Erro ao comunicar com o TUTOR REGIS');
     }
 
     return new Response(response.body, {
