@@ -158,7 +158,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('PERSON MENTORIA - Boletim de Desempenho', 105, 12, { align: 'center' });
+      doc.text('Mentoria Regisdência - Boletim de Desempenho', 105, 12, { align: 'center' });
       
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
@@ -270,7 +270,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Gerado em ${new Date().toLocaleString('pt-BR')} via PERRYMED - Página ${i} de ${pageCount}`,
+          `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
           105,
           285,
           { align: 'center' }

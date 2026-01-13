@@ -78,7 +78,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
           pdf.setFontSize(8);
           pdf.setTextColor(150, 150, 150);
           pdf.text(
-            `Gerado em ${new Date().toLocaleString('pt-BR')} via PERSON MENTORIA - Página ${i} de ${pageCount}`,
+            `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
             pageWidth / 2,
             pageHeight - 10,
             { align: 'center' }
@@ -95,7 +95,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(255, 255, 255);
-      pdf.text('PERSON MENTORIA - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
+      pdf.text('Mentoria Regisdência - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
       
       // Subtítulo de período
       pdf.setFontSize(10);
@@ -328,7 +328,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       addFooter();
 
       // Save PDF
-      pdf.save(`PERSON_MENTORIA_Relatorio_${startDate}_a_${endDate}.pdf`);
+      pdf.save(`Mentoria_Regisdencia_Relatorio_${startDate}_a_${endDate}.pdf`);
 
       toast({
         title: "Relatório gerado com sucesso!",
@@ -497,7 +497,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
           <p>✓ Gráficos de desempenho por área médica</p>
           <p>✓ Evolução temporal da acurácia</p>
           <p>✓ Lista detalhada de todas as sessões de estudo</p>
-          <p>✓ Resultados de provas antigas realizadas</p>
+          <p>✓ Resultados de provas na íntegra realizadas</p>
           <p>✓ Estatísticas de aulas assistidas</p>
         </CardContent>
       </Card>

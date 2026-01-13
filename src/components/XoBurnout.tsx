@@ -188,7 +188,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
     doc.rect(0, 0, 210, 25, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
-    doc.text('PERSON MENTORIA - Relatório de Bem-Estar', 105, 15, { align: 'center' });
+    doc.text('Mentoria Regisdência - Relatório de Bem-Estar', 105, 15, { align: 'center' });
     
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
