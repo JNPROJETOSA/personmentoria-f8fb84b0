@@ -96,7 +96,7 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
       </CardHeader>
       
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4">
           {agenda?.days.map((day) => {
             const dayDate = addDays(weekStart, day.dayOfWeek);
             const isToday = day.dayOfWeek === today;
@@ -106,48 +106,48 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
               <div
                 key={day.dayOfWeek}
                 className={`
-                  p-3 rounded-lg backdrop-blur-sm border transition-all
+                  p-4 rounded-lg backdrop-blur-sm border transition-all min-w-0
                   ${isToday 
                     ? 'bg-primary/20 border-primary/50 ring-2 ring-primary/30' 
                     : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }
                 `}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h4 className={`font-semibold text-sm ${isToday ? 'text-primary' : 'text-white'}`}>
+                    <h4 className={`font-bold text-base ${isToday ? 'text-primary' : 'text-white'}`}>
                       {DAY_NAMES[day.dayOfWeek]}
                     </h4>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-sm text-slate-300">
                       {format(dayDate, 'dd/MM')}
                     </span>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-slate-400 hover:text-white"
+                    className="h-8 w-8 text-slate-300 hover:text-white hover:bg-white/10"
                     onClick={() => setEditingDay(isEditing ? null : day.dayOfWeek)}
                   >
-                    {isEditing ? <X className="h-3 w-3" /> : <Edit2 className="h-3 w-3" />}
+                    {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
                   </Button>
                 </div>
 
-                <div className="space-y-1.5 min-h-[60px]">
+                <div className="space-y-2 min-h-[80px]">
                   {day.tasks.length === 0 && !isEditing && (
-                    <p className="text-xs text-slate-500 italic">Nenhuma tarefa</p>
+                    <p className="text-sm text-slate-400 italic">Nenhuma tarefa</p>
                   )}
                   
                   {day.tasks.map((task, taskIndex) => (
                     <div
                       key={taskIndex}
-                      className="flex items-center gap-1 group"
+                      className="flex items-start gap-2 group"
                     >
                       {editingTaskIndex === taskIndex && isEditing ? (
-                        <div className="flex items-center gap-1 flex-1">
+                        <div className="flex items-center gap-2 flex-1">
                           <Input
                             value={editingTaskValue}
                             onChange={(e) => setEditingTaskValue(e.target.value)}
-                            className="h-6 text-xs bg-white/10 border-white/20"
+                            className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleEditTask(day.dayOfWeek, taskIndex);
                               if (e.key === 'Escape') setEditingTaskIndex(null);
@@ -156,34 +156,34 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-5 w-5 text-green-400"
+                            className="h-7 w-7 text-green-400 hover:text-green-300 hover:bg-green-400/10"
                             onClick={() => handleEditTask(day.dayOfWeek, taskIndex)}
                           >
-                            <Check className="h-3 w-3" />
+                            <Check className="h-4 w-4" />
                           </Button>
                         </div>
                       ) : (
                         <>
-                          <span className="text-xs text-slate-300 flex-1 truncate">
+                          <span className="text-sm text-white leading-relaxed flex-1 break-words whitespace-normal">
                             • {task}
                           </span>
                           {isEditing && (
-                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-1 shrink-0">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-5 w-5 text-slate-400 hover:text-white"
+                                className="h-6 w-6 text-slate-300 hover:text-white hover:bg-white/10"
                                 onClick={() => startEditingTask(taskIndex, task)}
                               >
-                                <Edit2 className="h-2.5 w-2.5" />
+                                <Edit2 className="h-3 w-3" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-5 w-5 text-slate-400 hover:text-red-400"
+                                className="h-6 w-6 text-slate-300 hover:text-red-400 hover:bg-red-400/10"
                                 onClick={() => handleRemoveTask(day.dayOfWeek, taskIndex)}
                               >
-                                <Trash2 className="h-2.5 w-2.5" />
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           )}
@@ -193,12 +193,12 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                   ))}
 
                   {isEditing && (
-                    <div className="flex items-center gap-1 mt-2">
+                    <div className="flex items-center gap-2 mt-3">
                       <Input
                         value={newTask}
                         onChange={(e) => setNewTask(e.target.value)}
                         placeholder="Nova tarefa..."
-                        className="h-6 text-xs bg-white/10 border-white/20 placeholder:text-slate-500"
+                        className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleAddTask(day.dayOfWeek);
                         }}
@@ -206,10 +206,10 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-primary hover:text-primary/80"
+                        className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/10"
                         onClick={() => handleAddTask(day.dayOfWeek)}
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   )}
