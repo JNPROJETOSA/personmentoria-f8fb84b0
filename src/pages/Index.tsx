@@ -49,7 +49,7 @@ const AuthenticatedApp = () => {
   // Cloud database hooks
   const { classes, addClass, updateClass, deleteClass } = useClasses(user?.id);
   const { exercises, addExercise, deleteExercise } = useExercises(user?.id);
-  const { flashcards, addFlashcard, deleteFlashcard } = useFlashcards(user?.id);
+  const { flashcards, addFlashcard, deleteFlashcard, updateFlashcard } = useFlashcards(user?.id);
   const { goals, updateGoals } = useGoals(user?.id);
   const { items: dreamBoardItems, addItem: addDreamItem, deleteItem: deleteDreamItem } = useDreamBoard(user?.id);
   const { notebookData, updateNotebook } = useNotebook(user?.id);
@@ -190,7 +190,7 @@ const AuthenticatedApp = () => {
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
       case 'notebook': return <Notebook data={notebookData} onUpdate={updateNotebook} />;
       case 'pomodoro': return <Pomodoro />;
-      case 'flashcards': return <Flashcards flashcards={flashcards} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} />;
+      case 'flashcards': return <Flashcards flashcards={flashcards} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} updateFlashcard={updateFlashcard} />;
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} addItem={addDreamItem} deleteItem={deleteDreamItem} />;
       case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} editorials={editorials} selectedEditorialId={selectedEditorialId} setSelectedEditorialId={setSelectedEditorialId} createEditorial={createEditorial} deleteEditorial={deleteEditorial} renameEditorial={renameEditorial} />;
