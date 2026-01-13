@@ -3,20 +3,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, BookOpen, PenTool, FileText, Trophy, Flame, BarChart3 } from 'lucide-react';
+import { Users, BookOpen, PenTool, FileText, Trophy, Flame, BarChart3, Lock, Unlock } from 'lucide-react';
 import { UserSummary } from '@/hooks/useAdminData';
 import AdminUserAnalysis from './AdminUserAnalysis';
+import { toast } from 'sonner';
 
 interface AdminDashboardProps {
   users: UserSummary[];
   loading: boolean;
+  toggleFreezeUser: (userId: string, frozen: boolean) => Promise<boolean>;
 }
 
-const AdminDashboard = ({ users, loading }: AdminDashboardProps) => {
+const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProps) => {
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
+  const [freezingUserId, setFreezingUserId] = useState<string | null>(null);
 
   const handleViewAnalysis = (user: UserSummary) => {
     setSelectedUser(user);
+  };
+
+  const handleToggleFreeze = async (user: UserSummary) => {
+    setFreezingUserId(user.user_id);
+    const success = await toggleFreezeUser(user.user_id, !user.frozen);
+    setFreezingUserId(null);
+    
+    if (success) {
+      toast.success(user.frozen ? `Conta de ${user.name} descongelada` : `Conta de ${user.name} congelada`);
+    } else {
+      toast.error('Erro ao alterar status da conta');
+    }
   };
 
   // If viewing a specific user, show the analysis component
@@ -127,6 +142,7 @@ const AdminDashboard = ({ users, loading }: AdminDashboardProps) => {
                 <TableHead className="text-center">Aulas</TableHead>
                 <TableHead className="text-center">Acerto</TableHead>
                 <TableHead className="text-center">Último Estudo</TableHead>
+                <TableHead className="text-center">Status</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -157,11 +173,40 @@ const AdminDashboard = ({ users, loading }: AdminDashboardProps) => {
                   <TableCell className="text-center text-sm text-muted-foreground">
                     {user.last_study_date || 'Nunca'}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {user.frozen ? (
+                      <Badge variant="destructive">Congelada</Badge>
+                    ) : (
+                      <Badge variant="secondary">Ativa</Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" onClick={() => handleViewAnalysis(user)}>
-                      <BarChart3 className="w-4 h-4 mr-1" />
-                      Análise
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant={user.frozen ? "default" : "destructive"} 
+                        size="sm" 
+                        onClick={() => handleToggleFreeze(user)}
+                        disabled={freezingUserId === user.user_id}
+                      >
+                        {freezingUserId === user.user_id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                        ) : user.frozen ? (
+                          <>
+                            <Unlock className="w-4 h-4 mr-1" />
+                            Descongelar
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4 mr-1" />
+                            Congelar
+                          </>
+                        )}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleViewAnalysis(user)}>
+                        <BarChart3 className="w-4 h-4 mr-1" />
+                        Análise
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -15,6 +15,7 @@ export interface UserSummary {
   totalClasses: number;
   flashcardCount: number;
   totalAccuracy: number;
+  frozen: boolean;
 }
 
 export function useAdminData(isAdmin: boolean) {
@@ -100,7 +101,8 @@ export function useAdminData(isAdmin: boolean) {
             classesStudied: userClasses.filter(c => c.studied).length,
             totalClasses: userClasses.length,
             flashcardCount: userFlashcards.length,
-            totalAccuracy: Math.round(accuracy * 10) / 10
+            totalAccuracy: Math.round(accuracy * 10) / 10,
+            frozen: profile.frozen || false
           };
         });
 
@@ -115,5 +117,22 @@ export function useAdminData(isAdmin: boolean) {
     fetchAllUsersData();
   }, [isAdmin]);
 
-  return { users, loading, selectedUserId, setSelectedUserId };
+  const toggleFreezeUser = async (userId: string, frozen: boolean) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ frozen })
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error toggling freeze:', error);
+      return false;
+    }
+
+    setUsers(prev => prev.map(u => 
+      u.user_id === userId ? { ...u, frozen } : u
+    ));
+    return true;
+  };
+
+  return { users, loading, selectedUserId, setSelectedUserId, toggleFreezeUser };
 }

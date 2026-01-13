@@ -400,6 +400,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
+          frozen: boolean
           id: string
           last_study_date: string | null
           level: number | null
@@ -412,6 +413,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          frozen?: boolean
           id?: string
           last_study_date?: string | null
           level?: number | null
@@ -424,6 +426,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          frozen?: boolean
           id?: string
           last_study_date?: string | null
           level?: number | null
@@ -532,6 +535,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_user_frozen: { Args: { check_user_id: string }; Returns: boolean }
       validate_invite_code: { Args: { code_input: string }; Returns: boolean }
     }
     Enums: {

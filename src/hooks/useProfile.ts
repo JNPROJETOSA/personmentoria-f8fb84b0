@@ -9,6 +9,7 @@ interface Profile {
   level: number;
   streak: number;
   last_study_date: string | null;
+  frozen: boolean;
 }
 
 export function useProfile(userId: string | undefined) {
