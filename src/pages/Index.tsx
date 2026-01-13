@@ -19,6 +19,7 @@ import XoBurnout from '@/components/XoBurnout';
 import ExamMode from '@/components/ExamMode';
 import ProfileSettings from '@/components/ProfileSettings';
 import AdminDashboard from '@/components/AdminDashboard';
+import FrozenAccountScreen from '@/components/FrozenAccountScreen';
 import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
 import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,10 @@ const AuthenticatedApp = () => {
   
   // Admin hooks
   const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
-  const { users: adminUsers, loading: adminLoading } = useAdminData(isAdmin);
+  const { users: adminUsers, loading: adminLoading, toggleFreezeUser } = useAdminData(isAdmin);
+
+  // Check if user is frozen
+  const isFrozen = profile?.frozen || false;
 
   // UserProgress from profile
   const userProgress: UserProgress = {
@@ -197,7 +201,7 @@ const AuthenticatedApp = () => {
       case 'xo-burnout': return burnoutLoading ? <div className="text-center py-8">Carregando...</div> : <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
       case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       case 'profile-settings': return <ProfileSettings profile={profile} updateProfile={updateProfile} userEmail={user?.email} />;
-      case 'admin': return <AdminDashboard users={adminUsers} loading={adminLoading} />;
+      case 'admin': return <AdminDashboard users={adminUsers} loading={adminLoading} toggleFreezeUser={toggleFreezeUser} />;
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
     }
   };
@@ -215,6 +219,11 @@ const AuthenticatedApp = () => {
       <span>{label}</span>
     </button>
   );
+
+  // Show frozen account screen if user is frozen
+  if (isFrozen) {
+    return <FrozenAccountScreen userName={profile?.name || 'Estudante'} onSignOut={signOut} />;
+  }
 
   return (
     <div className="min-h-screen flex w-full">
