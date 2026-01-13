@@ -14,17 +14,25 @@ interface FlashcardsProps {
   flashcards: Flashcard[];
   addFlashcard: (flashcard: Omit<Flashcard, 'id' | 'difficulty' | 'lastReviewed' | 'nextReview' | 'reviewCount'>) => Promise<void>;
   deleteFlashcard: (id: string) => Promise<void>;
+  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string }) => Promise<void>;
 }
 
-export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }: FlashcardsProps) {
+export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, updateFlashcard }: FlashcardsProps) {
   const isMountedRef = useRef(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState<string | null>(null);
   const [isStudying, setIsStudying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [filterArea, setFilterArea] = useState<MedicalArea | 'all'>('all');
   
   const [newCard, setNewCard] = useState({
+    area: MedicalArea.PEDIATRIA,
+    front: '',
+    back: ''
+  });
+
+  const [editCard, setEditCard] = useState({
     area: MedicalArea.PEDIATRIA,
     front: '',
     back: ''
@@ -69,6 +77,45 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
     });
   };
 
+  const handleStartEdit = (card: Flashcard) => {
+    setEditCard({
+      area: card.area,
+      front: card.front,
+      back: card.back
+    });
+    setIsEditing(card.id);
+  };
+
+  const handleUpdate = async () => {
+    if (!isEditing) return;
+    
+    if (!editCard.front.trim() || !editCard.back.trim()) {
+      if (isMountedRef.current) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha a frente e o verso do card",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+
+    await updateFlashcard(isEditing, {
+      area: editCard.area,
+      front: editCard.front,
+      back: editCard.back,
+    });
+
+    if (!isMountedRef.current) return;
+
+    setIsEditing(null);
+    
+    toast({
+      title: "Flashcard atualizado!",
+      description: "Card editado com sucesso"
+    });
+  };
+
   const handleDelete = async (id: string) => {
     await deleteFlashcard(id);
     if (isMountedRef.current) {
@@ -77,8 +124,6 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
   };
 
   const handleDifficultySelect = (difficulty: 'easy' | 'medium' | 'hard') => {
-    // TODO: Implement difficulty tracking in database
-    // For now, just move to next card
     setIsFlipped(false);
     
     if (currentIndex < filteredCards.length - 1) {
@@ -241,13 +286,22 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
                       <CardDescription className="text-xs">{card.area}</CardDescription>
                       <CardTitle className="text-sm mt-1 line-clamp-2">{card.front}</CardTitle>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(card.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStartEdit(card)}
+                      >
+                        <Edit className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(card.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -270,6 +324,51 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard }
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de Edição */}
+      <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Flashcard</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Área Médica</Label>
+              <Select value={editCard.area} onValueChange={(v) => setEditCard({ ...editCard, area: v as MedicalArea })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(MedicalArea).map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Frente (Pergunta)</Label>
+              <Textarea
+                value={editCard.front}
+                onChange={(e) => setEditCard({ ...editCard, front: e.target.value })}
+                placeholder="Ex: Quais são as contraindicações da vacina BCG?"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Verso (Resposta)</Label>
+              <Textarea
+                value={editCard.back}
+                onChange={(e) => setEditCard({ ...editCard, back: e.target.value })}
+                placeholder="Ex: Imunodeficiências, peso < 2kg, lesões de pele..."
+                rows={4}
+              />
+            </div>
+            <Button onClick={handleUpdate} className="w-full">
+              Salvar Alterações
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

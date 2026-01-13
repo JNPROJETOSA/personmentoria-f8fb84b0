@@ -86,5 +86,25 @@ export function useFlashcards(userId: string | undefined) {
     }
   };
 
-  return { flashcards, loading, addFlashcard, deleteFlashcard, setFlashcards };
+  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string }) => {
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('flashcards')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error updating flashcard:', error);
+    } else {
+      setFlashcards(prev => prev.map(f => 
+        f.id === id 
+          ? { ...f, ...updates, area: (updates.area || f.area) as any }
+          : f
+      ));
+    }
+  };
+
+  return { flashcards, loading, addFlashcard, deleteFlashcard, updateFlashcard, setFlashcards };
 }
