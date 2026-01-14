@@ -280,11 +280,39 @@ export type Database = {
         }
         Relationships: []
       }
+      flashcard_folders: {
+        Row: {
+          area: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       flashcards: {
         Row: {
           area: string
           back: string
           created_at: string | null
+          folder_id: string | null
           front: string
           id: string
           user_id: string
@@ -293,6 +321,7 @@ export type Database = {
           area: string
           back: string
           created_at?: string | null
+          folder_id?: string | null
           front: string
           id?: string
           user_id: string
@@ -301,11 +330,20 @@ export type Database = {
           area?: string
           back?: string
           created_at?: string | null
+          folder_id?: string | null
           front?: string
           id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "flashcards_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "flashcard_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       goals: {
         Row: {

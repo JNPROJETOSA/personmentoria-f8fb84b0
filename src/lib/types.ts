@@ -13,6 +13,7 @@ export interface Flashcard {
   area: MedicalArea;
   front: string;
   back: string;
+  folderId: string | null;
   difficulty: 'easy' | 'medium' | 'hard' | null;
   lastReviewed: string | null;
   nextReview: string | null;
