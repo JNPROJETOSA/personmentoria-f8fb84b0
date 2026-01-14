@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Edit, RotateCw } from 'lucide-react';
+import { Plus, Trash2, Edit, RotateCw, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Flashcard, MedicalArea } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface FlashcardsProps {
   flashcards: Flashcard[];
@@ -139,6 +141,128 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     }
   };
 
+  const handleExportPDF = () => {
+    if (flashcards.length === 0) {
+      toast({
+        title: "Nenhum flashcard",
+        description: "Crie flashcards antes de exportar",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(20, 184, 166); // brand-teal
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.text('Meus Flashcards', pageWidth / 2, 25, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.text(`Exportado em ${new Date().toLocaleDateString('pt-BR')}`, pageWidth / 2, 35, { align: 'center' });
+
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+
+    // Group flashcards by area
+    const groupedByArea = flashcards.reduce((acc, card) => {
+      if (!acc[card.area]) acc[card.area] = [];
+      acc[card.area].push(card);
+      return acc;
+    }, {} as Record<string, Flashcard[]>);
+
+    let yPosition = 50;
+
+    Object.entries(groupedByArea).forEach(([area, cards]) => {
+      // Check if we need a new page
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      // Area header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(20, 184, 166);
+      doc.text(area, 14, yPosition);
+      yPosition += 8;
+
+      // Table with cards
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['#', 'Pergunta (Frente)', 'Resposta (Verso)']],
+        body: cards.map((card, idx) => [
+          (idx + 1).toString(),
+          card.front,
+          card.back
+        ]),
+        headStyles: {
+          fillColor: [20, 184, 166],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold'
+        },
+        bodyStyles: {
+          textColor: [50, 50, 50]
+        },
+        alternateRowStyles: {
+          fillColor: [240, 253, 250]
+        },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 80 },
+          2: { cellWidth: 80 }
+        },
+        margin: { left: 14, right: 14 },
+        didDrawPage: () => {
+          // Footer on each page
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          doc.text(
+            `Página ${doc.getNumberOfPages()}`,
+            pageWidth / 2,
+            doc.internal.pageSize.getHeight() - 10,
+            { align: 'center' }
+          );
+        }
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 15;
+    });
+
+    // Summary at the end
+    doc.addPage();
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(20, 184, 166);
+    doc.text('Resumo', 14, 20);
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    
+    let summaryY = 35;
+    doc.text(`Total de flashcards: ${flashcards.length}`, 14, summaryY);
+    summaryY += 10;
+    
+    doc.text('Por área:', 14, summaryY);
+    summaryY += 8;
+    
+    Object.entries(groupedByArea).forEach(([area, cards]) => {
+      doc.text(`• ${area}: ${cards.length} cards`, 20, summaryY);
+      summaryY += 7;
+    });
+
+    doc.save('meus-flashcards.pdf');
+
+    toast({
+      title: "PDF exportado!",
+      description: `${flashcards.length} flashcards exportados com sucesso`
+    });
+  };
+
   if (isStudying && filteredCards.length > 0) {
     const card = filteredCards[currentIndex];
     
@@ -205,13 +329,18 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
               <CardTitle>Flashcards</CardTitle>
               <CardDescription>Sistema de memorização ativa</CardDescription>
             </div>
-            <Dialog open={isCreating} onOpenChange={setIsCreating}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Card
-                </Button>
-              </DialogTrigger>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExportPDF} disabled={flashcards.length === 0}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar PDF
+              </Button>
+              <Dialog open={isCreating} onOpenChange={setIsCreating}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Card
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Criar Flashcard</DialogTitle>
@@ -254,6 +383,7 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
