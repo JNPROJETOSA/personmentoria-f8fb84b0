@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Edit, RotateCw, Download } from 'lucide-react';
+import { Plus, Trash2, Edit, RotateCw, Download, FolderPlus, Folder, FolderOpen, MoveRight, ChevronRight, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,30 +9,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Flashcard, MedicalArea } from '@/lib/types';
+import { FlashcardFolder } from '@/hooks/useFlashcardFolders';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface FlashcardsProps {
   flashcards: Flashcard[];
+  folders: FlashcardFolder[];
   addFlashcard: (flashcard: Omit<Flashcard, 'id' | 'difficulty' | 'lastReviewed' | 'nextReview' | 'reviewCount'>) => Promise<void>;
   deleteFlashcard: (id: string) => Promise<void>;
-  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string }) => Promise<void>;
+  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string; folderId?: string | null }) => Promise<void>;
+  addFolder: (folder: { area: MedicalArea; name: string }) => Promise<FlashcardFolder | null>;
+  updateFolder: (id: string, updates: { name?: string }) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
 }
 
-export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, updateFlashcard }: FlashcardsProps) {
+export default function Flashcards({ 
+  flashcards, 
+  folders, 
+  addFlashcard, 
+  deleteFlashcard, 
+  updateFlashcard,
+  addFolder,
+  updateFolder,
+  deleteFolder
+}: FlashcardsProps) {
   const isMountedRef = useRef(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isEditing, setIsEditing] = useState<string | null>(null);
+  const [isEditingFolder, setIsEditingFolder] = useState<string | null>(null);
+  const [isMoving, setIsMoving] = useState<string | null>(null);
   const [isStudying, setIsStudying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [filterArea, setFilterArea] = useState<MedicalArea | 'all'>('all');
+  const [expandedAreas, setExpandedAreas] = useState<Set<MedicalArea>>(new Set(Object.values(MedicalArea)));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   
   const [newCard, setNewCard] = useState({
     area: MedicalArea.PEDIATRIA,
     front: '',
-    back: ''
+    back: '',
+    folderId: null as string | null
   });
 
   const [editCard, setEditCard] = useState({
@@ -41,15 +62,71 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     back: ''
   });
 
+  const [newFolder, setNewFolder] = useState({
+    area: MedicalArea.PEDIATRIA,
+    name: ''
+  });
+
+  const [editFolderName, setEditFolderName] = useState('');
+  const [moveTargetFolder, setMoveTargetFolder] = useState<string | 'none'>('none');
+
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  const filteredCards = filterArea === 'all' 
-    ? flashcards 
-    : flashcards.filter(c => c.area === filterArea);
+  // Get flashcards for current view
+  const getFilteredCards = () => {
+    let cards = flashcards;
+    
+    if (filterArea !== 'all') {
+      cards = cards.filter(c => c.area === filterArea);
+    }
+    
+    if (selectedFolder) {
+      cards = cards.filter(c => c.folderId === selectedFolder);
+    }
+    
+    return cards;
+  };
+
+  const filteredCards = getFilteredCards();
+
+  // Get cards without folder for an area
+  const getLooseCards = (area: MedicalArea) => {
+    return flashcards.filter(c => c.area === area && !c.folderId);
+  };
+
+  // Get cards in a folder
+  const getCardsInFolder = (folderId: string) => {
+    return flashcards.filter(c => c.folderId === folderId);
+  };
+
+  // Get folders for an area
+  const getFoldersForArea = (area: MedicalArea) => {
+    return folders.filter(f => f.area === area);
+  };
+
+  const toggleArea = (area: MedicalArea) => {
+    const newExpanded = new Set(expandedAreas);
+    if (newExpanded.has(area)) {
+      newExpanded.delete(area);
+    } else {
+      newExpanded.add(area);
+    }
+    setExpandedAreas(newExpanded);
+  };
+
+  const toggleFolder = (folderId: string) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(folderId)) {
+      newExpanded.delete(folderId);
+    } else {
+      newExpanded.add(folderId);
+    }
+    setExpandedFolders(newExpanded);
+  };
 
   const handleCreate = async () => {
     if (!newCard.front.trim() || !newCard.back.trim()) {
@@ -67,17 +144,47 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
       area: newCard.area,
       front: newCard.front,
       back: newCard.back,
+      folderId: newCard.folderId
     });
 
     if (!isMountedRef.current) return;
 
-    setNewCard({ area: MedicalArea.PEDIATRIA, front: '', back: '' });
+    setNewCard({ area: MedicalArea.PEDIATRIA, front: '', back: '', folderId: null });
     setIsCreating(false);
     
     toast({
       title: "Flashcard criado!",
       description: "Card adicionado com sucesso"
     });
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFolder.name.trim()) {
+      if (isMountedRef.current) {
+        toast({
+          title: "Nome obrigatório",
+          description: "Digite um nome para a pasta",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+
+    const result = await addFolder({
+      area: newFolder.area,
+      name: newFolder.name
+    });
+
+    if (!isMountedRef.current) return;
+
+    if (result) {
+      setNewFolder({ area: MedicalArea.PEDIATRIA, name: '' });
+      setIsCreatingFolder(false);
+      toast({
+        title: "Pasta criada!",
+        description: `Pasta "${result.name}" criada em ${result.area}`
+      });
+    }
   };
 
   const handleStartEdit = (card: Flashcard) => {
@@ -87,6 +194,11 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
       back: card.back
     });
     setIsEditing(card.id);
+  };
+
+  const handleStartEditFolder = (folder: FlashcardFolder) => {
+    setEditFolderName(folder.name);
+    setIsEditingFolder(folder.id);
   };
 
   const handleUpdate = async () => {
@@ -119,11 +231,53 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     });
   };
 
+  const handleUpdateFolder = async () => {
+    if (!isEditingFolder || !editFolderName.trim()) return;
+
+    await updateFolder(isEditingFolder, { name: editFolderName });
+
+    if (!isMountedRef.current) return;
+
+    setIsEditingFolder(null);
+    toast({
+      title: "Pasta renomeada!",
+      description: "Nome atualizado com sucesso"
+    });
+  };
+
   const handleDelete = async (id: string) => {
     await deleteFlashcard(id);
     if (isMountedRef.current) {
       toast({ title: "Card excluído" });
     }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    // Cards in this folder will have folder_id set to NULL due to ON DELETE SET NULL
+    await deleteFolder(id);
+    if (isMountedRef.current) {
+      toast({ title: "Pasta excluída", description: "Os flashcards foram movidos para fora da pasta" });
+    }
+  };
+
+  const handleStartMove = (cardId: string, currentFolderId: string | null) => {
+    setIsMoving(cardId);
+    setMoveTargetFolder(currentFolderId || 'none');
+  };
+
+  const handleMoveCard = async () => {
+    if (!isMoving) return;
+
+    const targetFolder = moveTargetFolder === 'none' ? null : moveTargetFolder;
+    await updateFlashcard(isMoving, { folderId: targetFolder });
+
+    if (!isMountedRef.current) return;
+
+    setIsMoving(null);
+    toast({
+      title: "Flashcard movido!",
+      description: targetFolder ? "Card movido para a pasta" : "Card removido da pasta"
+    });
   };
 
   const handleDifficultySelect = (difficulty: 'easy' | 'medium' | 'hard') => {
@@ -155,7 +309,7 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // Header
-    doc.setFillColor(20, 184, 166); // brand-teal
+    doc.setFillColor(20, 184, 166);
     doc.rect(0, 0, pageWidth, 40, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
@@ -164,10 +318,9 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     doc.setFontSize(10);
     doc.text(`Exportado em ${new Date().toLocaleDateString('pt-BR')}`, pageWidth / 2, 35, { align: 'center' });
 
-    // Reset text color
     doc.setTextColor(0, 0, 0);
 
-    // Group flashcards by area
+    // Group flashcards by area and folder
     const groupedByArea = flashcards.reduce((acc, card) => {
       if (!acc[card.area]) acc[card.area] = [];
       acc[card.area].push(card);
@@ -177,62 +330,77 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     let yPosition = 50;
 
     Object.entries(groupedByArea).forEach(([area, cards]) => {
-      // Check if we need a new page
       if (yPosition > 250) {
         doc.addPage();
         yPosition = 20;
       }
 
-      // Area header
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(20, 184, 166);
       doc.text(area, 14, yPosition);
       yPosition += 8;
 
-      // Table with cards
-      autoTable(doc, {
-        startY: yPosition,
-        head: [['#', 'Pergunta (Frente)', 'Resposta (Verso)']],
-        body: cards.map((card, idx) => [
-          (idx + 1).toString(),
-          card.front,
-          card.back
-        ]),
-        headStyles: {
-          fillColor: [20, 184, 166],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold'
-        },
-        bodyStyles: {
-          textColor: [50, 50, 50]
-        },
-        alternateRowStyles: {
-          fillColor: [240, 253, 250]
-        },
-        columnStyles: {
-          0: { cellWidth: 10 },
-          1: { cellWidth: 80 },
-          2: { cellWidth: 80 }
-        },
-        margin: { left: 14, right: 14 },
-        didDrawPage: () => {
-          // Footer on each page
-          doc.setFontSize(8);
-          doc.setTextColor(150, 150, 150);
-          doc.text(
-            `Página ${doc.getNumberOfPages()}`,
-            pageWidth / 2,
-            doc.internal.pageSize.getHeight() - 10,
-            { align: 'center' }
-          );
+      // Group by folder within area
+      const areaFolders = folders.filter(f => f.area === area);
+      const looseCards = cards.filter(c => !c.folderId);
+      
+      // Cards without folder first
+      if (looseCards.length > 0) {
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['#', 'Pergunta', 'Resposta']],
+          body: looseCards.map((card, idx) => [
+            (idx + 1).toString(),
+            card.front,
+            card.back
+          ]),
+          headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: 'bold' },
+          bodyStyles: { textColor: [50, 50, 50] },
+          alternateRowStyles: { fillColor: [240, 253, 250] },
+          columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 80 }, 2: { cellWidth: 80 } },
+          margin: { left: 14, right: 14 }
+        });
+        yPosition = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // Cards in folders
+      areaFolders.forEach(folder => {
+        const folderCards = cards.filter(c => c.folderId === folder.id);
+        if (folderCards.length === 0) return;
+
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
         }
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text(`📁 ${folder.name}`, 20, yPosition);
+        yPosition += 6;
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['#', 'Pergunta', 'Resposta']],
+          body: folderCards.map((card, idx) => [
+            (idx + 1).toString(),
+            card.front,
+            card.back
+          ]),
+          headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: 'bold' },
+          bodyStyles: { textColor: [50, 50, 50] },
+          alternateRowStyles: { fillColor: [240, 253, 250] },
+          columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 80 }, 2: { cellWidth: 80 } },
+          margin: { left: 20, right: 14 }
+        });
+        yPosition = (doc as any).lastAutoTable.finalY + 10;
       });
 
-      yPosition = (doc as any).lastAutoTable.finalY + 15;
+      yPosition += 5;
     });
 
-    // Summary at the end
+    // Summary
     doc.addPage();
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
@@ -245,6 +413,8 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     
     let summaryY = 35;
     doc.text(`Total de flashcards: ${flashcards.length}`, 14, summaryY);
+    summaryY += 10;
+    doc.text(`Total de pastas: ${folders.length}`, 14, summaryY);
     summaryY += 10;
     
     doc.text('Por área:', 14, summaryY);
@@ -263,6 +433,7 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     });
   };
 
+  // Study mode
   if (isStudying && filteredCards.length > 0) {
     const card = filteredCards[currentIndex];
     
@@ -320,6 +491,10 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
     );
   }
 
+  // Get current card for move dialog
+  const movingCard = isMoving ? flashcards.find(c => c.id === isMoving) : null;
+  const movingCardFolders = movingCard ? folders.filter(f => f.area === movingCard.area) : [];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <Card>
@@ -327,13 +502,56 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
           <div className="flex justify-between items-center">
             <div>
               <CardTitle>Flashcards</CardTitle>
-              <CardDescription>Sistema de memorização ativa</CardDescription>
+              <CardDescription>Sistema de memorização ativa com pastas organizadas por área</CardDescription>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleExportPDF} disabled={flashcards.length === 0}>
                 <Download className="w-4 h-4 mr-2" />
                 Exportar PDF
               </Button>
+              
+              {/* Create Folder Dialog */}
+              <Dialog open={isCreatingFolder} onOpenChange={setIsCreatingFolder}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <FolderPlus className="w-4 h-4 mr-2" />
+                    Nova Pasta
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Criar Pasta</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Área Médica</Label>
+                      <Select value={newFolder.area} onValueChange={(v) => setNewFolder({ ...newFolder, area: v as MedicalArea })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.values(MedicalArea).map(area => (
+                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nome da Pasta</Label>
+                      <Input
+                        value={newFolder.name}
+                        onChange={(e) => setNewFolder({ ...newFolder, name: e.target.value })}
+                        placeholder="Ex: Vacinação, Pneumonia, Cardiopatias..."
+                      />
+                    </div>
+                    <Button onClick={handleCreateFolder} className="w-full">
+                      Criar Pasta
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Create Card Dialog */}
               <Dialog open={isCreating} onOpenChange={setIsCreating}>
                 <DialogTrigger asChild>
                   <Button>
@@ -341,54 +559,79 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
                     Novo Card
                   </Button>
                 </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Flashcard</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Área Médica</Label>
-                    <Select value={newCard.area} onValueChange={(v) => setNewCard({ ...newCard, area: v as MedicalArea })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.values(MedicalArea).map(area => (
-                          <SelectItem key={area} value={area}>{area}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Criar Flashcard</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Área Médica</Label>
+                      <Select 
+                        value={newCard.area} 
+                        onValueChange={(v) => setNewCard({ ...newCard, area: v as MedicalArea, folderId: null })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.values(MedicalArea).map(area => (
+                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Pasta (opcional)</Label>
+                      <Select 
+                        value={newCard.folderId || 'none'} 
+                        onValueChange={(v) => setNewCard({ ...newCard, folderId: v === 'none' ? null : v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sem pasta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sem pasta</SelectItem>
+                          {folders.filter(f => f.area === newCard.area).map(folder => (
+                            <SelectItem key={folder.id} value={folder.id}>
+                              <span className="flex items-center gap-2">
+                                <Folder className="w-4 h-4" />
+                                {folder.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Frente (Pergunta)</Label>
+                      <Textarea
+                        value={newCard.front}
+                        onChange={(e) => setNewCard({ ...newCard, front: e.target.value })}
+                        placeholder="Ex: Quais são as contraindicações da vacina BCG?"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Verso (Resposta)</Label>
+                      <Textarea
+                        value={newCard.back}
+                        onChange={(e) => setNewCard({ ...newCard, back: e.target.value })}
+                        placeholder="Ex: Imunodeficiências, peso < 2kg, lesões de pele..."
+                        rows={4}
+                      />
+                    </div>
+                    <Button onClick={handleCreate} className="w-full">
+                      Criar Flashcard
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Frente (Pergunta)</Label>
-                    <Textarea
-                      value={newCard.front}
-                      onChange={(e) => setNewCard({ ...newCard, front: e.target.value })}
-                      placeholder="Ex: Quais são as contraindicações da vacina BCG?"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Verso (Resposta)</Label>
-                    <Textarea
-                      value={newCard.back}
-                      onChange={(e) => setNewCard({ ...newCard, back: e.target.value })}
-                      placeholder="Ex: Imunodeficiências, peso < 2kg, lesões de pele..."
-                      rows={4}
-                    />
-                  </div>
-                  <Button onClick={handleCreate} className="w-full">
-                    Criar Flashcard
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-4 items-center">
-            <Select value={filterArea} onValueChange={(v) => setFilterArea(v as any)}>
+          <div className="flex gap-4 items-center flex-wrap">
+            <Select value={filterArea} onValueChange={(v) => { setFilterArea(v as any); setSelectedFolder(null); }}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Filtrar por área" />
               </SelectTrigger>
@@ -400,68 +643,153 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
               </SelectContent>
             </Select>
             
-            {filteredCards.length > 0 && (
-              <Button onClick={() => { setIsStudying(true); setCurrentIndex(0); setIsFlipped(false); }}>
+            {flashcards.length > 0 && (
+              <Button onClick={() => { setIsStudying(true); setCurrentIndex(0); setIsFlipped(false); setSelectedFolder(null); }}>
                 <RotateCw className="w-4 h-4 mr-2" />
                 Iniciar Estudo ({filteredCards.length} cards)
               </Button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCards.map(card => (
-              <Card key={card.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardDescription className="text-xs">{card.area}</CardDescription>
-                      <CardTitle className="text-sm mt-1 line-clamp-2">{card.front}</CardTitle>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleStartEdit(card)}
-                      >
-                        <Edit className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir este flashcard? Esta ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(card.id)}>
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+          {/* Folder Tree View */}
+          <div className="space-y-2">
+            {Object.values(MedicalArea).map(area => {
+              const areaFolders = getFoldersForArea(area);
+              const looseCards = getLooseCards(area);
+              const totalCardsInArea = flashcards.filter(c => c.area === area).length;
+              
+              if (filterArea !== 'all' && filterArea !== area) return null;
+              if (totalCardsInArea === 0 && areaFolders.length === 0) return null;
+
+              return (
+                <div key={area} className="border rounded-lg overflow-hidden">
+                  {/* Area Header */}
+                  <div
+                    className="flex items-center justify-between p-3 bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() => toggleArea(area)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {expandedAreas.has(area) ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                      <span className="font-medium">{area}</span>
+                      <span className="text-sm text-muted-foreground">
+                        ({totalCardsInArea} cards, {areaFolders.length} pastas)
+                      </span>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-3">{card.back}</p>
-                  {card.reviewCount > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Revisado {card.reviewCount}x
-                    </p>
+
+                  {expandedAreas.has(area) && (
+                    <div className="p-2 space-y-2">
+                      {/* Folders */}
+                      {areaFolders.map(folder => {
+                        const folderCards = getCardsInFolder(folder.id);
+                        
+                        return (
+                          <div key={folder.id} className="ml-4">
+                            <div
+                              className="flex items-center justify-between p-2 rounded-md hover:bg-muted/30 cursor-pointer"
+                              onClick={() => toggleFolder(folder.id)}
+                            >
+                              <div className="flex items-center gap-2">
+                                {expandedFolders.has(folder.id) ? (
+                                  <>
+                                    <ChevronDown className="w-4 h-4" />
+                                    <FolderOpen className="w-4 h-4 text-primary" />
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronRight className="w-4 h-4" />
+                                    <Folder className="w-4 h-4 text-primary" />
+                                  </>
+                                )}
+                                <span className="font-medium">{folder.name}</span>
+                                <span className="text-sm text-muted-foreground">({folderCards.length})</span>
+                              </div>
+                              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="sm" onClick={() => handleStartEditFolder(folder)}>
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-3 h-3 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Excluir pasta?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Os flashcards dentro desta pasta não serão excluídos, apenas movidos para fora da pasta.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteFolder(folder.id)}>
+                                        Excluir
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </div>
+
+                            {expandedFolders.has(folder.id) && (
+                              <div className="ml-8 space-y-1 mt-1">
+                                {folderCards.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground py-2">Pasta vazia</p>
+                                ) : (
+                                  folderCards.map(card => (
+                                    <FlashcardItem
+                                      key={card.id}
+                                      card={card}
+                                      onEdit={handleStartEdit}
+                                      onDelete={handleDelete}
+                                      onMove={handleStartMove}
+                                    />
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Loose Cards (not in any folder) */}
+                      {looseCards.length > 0 && (
+                        <div className="ml-4">
+                          <div className="text-sm text-muted-foreground py-1 px-2">
+                            Sem pasta ({looseCards.length})
+                          </div>
+                          <div className="ml-6 space-y-1">
+                            {looseCards.map(card => (
+                              <FlashcardItem
+                                key={card.id}
+                                card={card}
+                                onEdit={handleStartEdit}
+                                onDelete={handleDelete}
+                                onMove={handleStartMove}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {areaFolders.length === 0 && looseCards.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum flashcard nesta área
+                        </p>
+                      )}
+                    </div>
                   )}
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              );
+            })}
           </div>
 
-          {filteredCards.length === 0 && (
+          {flashcards.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <p>Nenhum flashcard encontrado.</p>
               <p className="text-sm mt-2">Crie seu primeiro card para começar!</p>
@@ -470,7 +798,7 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
         </CardContent>
       </Card>
 
-      {/* Dialog de Edição */}
+      {/* Edit Card Dialog */}
       <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
         <DialogContent>
           <DialogHeader>
@@ -495,7 +823,6 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
               <Textarea
                 value={editCard.front}
                 onChange={(e) => setEditCard({ ...editCard, front: e.target.value })}
-                placeholder="Ex: Quais são as contraindicações da vacina BCG?"
                 rows={3}
               />
             </div>
@@ -504,7 +831,6 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
               <Textarea
                 value={editCard.back}
                 onChange={(e) => setEditCard({ ...editCard, back: e.target.value })}
-                placeholder="Ex: Imunodeficiências, peso < 2kg, lesões de pele..."
                 rows={4}
               />
             </div>
@@ -514,6 +840,116 @@ export default function Flashcards({ flashcards, addFlashcard, deleteFlashcard, 
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Folder Dialog */}
+      <Dialog open={isEditingFolder !== null} onOpenChange={(open) => !open && setIsEditingFolder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Pasta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Novo Nome</Label>
+              <Input
+                value={editFolderName}
+                onChange={(e) => setEditFolderName(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleUpdateFolder} className="w-full">
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Card Dialog */}
+      <Dialog open={isMoving !== null} onOpenChange={(open) => !open && setIsMoving(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mover Flashcard</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Selecione a pasta de destino</Label>
+              <Select value={moveTargetFolder} onValueChange={setMoveTargetFolder}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem pasta</SelectItem>
+                  {movingCardFolders.map(folder => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      <span className="flex items-center gap-2">
+                        <Folder className="w-4 h-4" />
+                        {folder.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {movingCardFolders.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma pasta disponível nesta área. Crie uma pasta primeiro.
+                </p>
+              )}
+            </div>
+            <Button onClick={handleMoveCard} className="w-full">
+              Mover
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Subcomponent for flashcard item
+function FlashcardItem({ 
+  card, 
+  onEdit, 
+  onDelete, 
+  onMove 
+}: { 
+  card: Flashcard; 
+  onEdit: (card: Flashcard) => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, folderId: string | null) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between p-2 rounded-md bg-card border hover:shadow-sm transition-shadow">
+      <div className="flex-1 min-w-0 mr-2">
+        <p className="text-sm font-medium truncate">{card.front}</p>
+        <p className="text-xs text-muted-foreground truncate">{card.back}</p>
+      </div>
+      <div className="flex gap-1 shrink-0">
+        <Button variant="ghost" size="sm" onClick={() => onMove(card.id, card.folderId)}>
+          <MoveRight className="w-3 h-3" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => onEdit(card)}>
+          <Edit className="w-3 h-3" />
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <Trash2 className="w-3 h-3 text-destructive" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir este flashcard?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(card.id)}>
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }

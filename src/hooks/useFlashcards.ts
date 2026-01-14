@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Flashcard } from '@/lib/types';
 
 export function useFlashcards(userId: string | undefined) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) {
@@ -19,6 +27,8 @@ export function useFlashcards(userId: string | undefined) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
+      if (!isMountedRef.current) return;
+
       if (error) {
         console.error('Error fetching flashcards:', error);
       } else {
@@ -27,6 +37,7 @@ export function useFlashcards(userId: string | undefined) {
           area: f.area as any,
           front: f.front,
           back: f.back,
+          folderId: f.folder_id || null,
           difficulty: null,
           lastReviewed: null,
           nextReview: null,
@@ -49,10 +60,13 @@ export function useFlashcards(userId: string | undefined) {
         user_id: userId,
         area: flashcard.area,
         front: flashcard.front,
-        back: flashcard.back
+        back: flashcard.back,
+        folder_id: flashcard.folderId || null
       })
       .select()
       .single();
+
+    if (!isMountedRef.current) return;
 
     if (error) {
       console.error('Error adding flashcard:', error);
@@ -62,6 +76,7 @@ export function useFlashcards(userId: string | undefined) {
         area: data.area as any,
         front: data.front,
         back: data.back,
+        folderId: data.folder_id || null,
         difficulty: null,
         lastReviewed: null,
         nextReview: null,
@@ -79,6 +94,8 @@ export function useFlashcards(userId: string | undefined) {
       .eq('id', id)
       .eq('user_id', userId);
 
+    if (!isMountedRef.current) return;
+
     if (error) {
       console.error('Error deleting flashcard:', error);
     } else {
@@ -86,25 +103,43 @@ export function useFlashcards(userId: string | undefined) {
     }
   };
 
-  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string }) => {
+  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string; folderId?: string | null }) => {
     if (!userId) return;
+
+    const dbUpdates: any = {};
+    if (updates.area !== undefined) dbUpdates.area = updates.area;
+    if (updates.front !== undefined) dbUpdates.front = updates.front;
+    if (updates.back !== undefined) dbUpdates.back = updates.back;
+    if (updates.folderId !== undefined) dbUpdates.folder_id = updates.folderId;
 
     const { error } = await supabase
       .from('flashcards')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', userId);
+
+    if (!isMountedRef.current) return;
 
     if (error) {
       console.error('Error updating flashcard:', error);
     } else {
       setFlashcards(prev => prev.map(f => 
         f.id === id 
-          ? { ...f, ...updates, area: (updates.area || f.area) as any }
+          ? { 
+              ...f, 
+              area: (updates.area || f.area) as any,
+              front: updates.front !== undefined ? updates.front : f.front,
+              back: updates.back !== undefined ? updates.back : f.back,
+              folderId: updates.folderId !== undefined ? updates.folderId : f.folderId
+            }
           : f
       ));
     }
   };
 
-  return { flashcards, loading, addFlashcard, deleteFlashcard, updateFlashcard, setFlashcards };
+  const moveFlashcardToFolder = async (flashcardId: string, folderId: string | null) => {
+    await updateFlashcard(flashcardId, { folderId });
+  };
+
+  return { flashcards, loading, addFlashcard, deleteFlashcard, updateFlashcard, moveFlashcardToFolder, setFlashcards };
 }

@@ -29,6 +29,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useClasses } from '@/hooks/useClasses';
 import { useExercises } from '@/hooks/useExercises';
 import { useFlashcards } from '@/hooks/useFlashcards';
+import { useFlashcardFolders } from '@/hooks/useFlashcardFolders';
 import { useGoals } from '@/hooks/useGoals';
 import { useDreamBoard } from '@/hooks/useDreamBoard';
 import { useNotebook } from '@/hooks/useNotebook';
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
   const { classes, addClass, updateClass, deleteClass } = useClasses(user?.id);
   const { exercises, addExercise, deleteExercise } = useExercises(user?.id);
   const { flashcards, addFlashcard, deleteFlashcard, updateFlashcard } = useFlashcards(user?.id);
+  const { folders, addFolder, updateFolder, deleteFolder } = useFlashcardFolders(user?.id);
   const { goals, updateGoals } = useGoals(user?.id);
   const { items: dreamBoardItems, addItem: addDreamItem, deleteItem: deleteDreamItem } = useDreamBoard(user?.id);
   const { notebookData, updateNotebook } = useNotebook(user?.id);
@@ -194,7 +196,7 @@ const AuthenticatedApp = () => {
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
       case 'notebook': return <Notebook data={notebookData} onUpdate={updateNotebook} />;
       case 'pomodoro': return <Pomodoro />;
-      case 'flashcards': return <Flashcards flashcards={flashcards} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} updateFlashcard={updateFlashcard} />;
+      case 'flashcards': return <Flashcards flashcards={flashcards} folders={folders} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} updateFlashcard={updateFlashcard} addFolder={addFolder} updateFolder={updateFolder} deleteFolder={deleteFolder} />;
       case 'banca-analysis': return <BancaAnalysis exams={exams} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} addItem={addDreamItem} deleteItem={deleteDreamItem} />;
       case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} editorials={editorials} selectedEditorialId={selectedEditorialId} setSelectedEditorialId={setSelectedEditorialId} createEditorial={createEditorial} deleteEditorial={deleteEditorial} renameEditorial={renameEditorial} />;
