@@ -20,7 +20,14 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
   const isMountedRef = useRef(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newImage, setNewImage] = useState({ url: '', title: '' });
-  const [newNote, setNewNote] = useState({ content: '', title: '' });
+  const [newNote, setNewNote] = useState({
+    content: '',
+    title: '',
+    color: '#fef3c7',
+    fontColor: '#000000',
+    fontSize: 'medium' as 'small' | 'medium' | 'large',
+    isAutoFit: false
+  });
 
   useEffect(() => {
     return () => {
@@ -70,12 +77,16 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
       type: 'note',
       content: newNote.content,
       title: newNote.title || 'Nota',
+      color: newNote.color,
+      fontColor: newNote.fontColor,
+      fontSize: newNote.fontSize,
+      isAutoFit: newNote.isAutoFit,
       createdAt: new Date().toISOString()
     });
 
     if (!isMountedRef.current) return;
 
-    setNewNote({ content: '', title: '' });
+    setNewNote({ content: '', title: '', color: '#fef3c7', fontColor: '#000000', fontSize: 'medium', isAutoFit: false });
     setIsAdding(false);
     toast({ title: "Nota adicionada ao mural!" });
   };
@@ -108,7 +119,7 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                   Adicionar
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Adicionar ao Mural</DialogTitle>
                 </DialogHeader>
@@ -148,7 +159,7 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                     </Button>
                   </TabsContent>
 
-                  <TabsContent value="note" className="space-y-4">
+                  <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="note-title">Título (opcional)</Label>
                       <Input
@@ -158,6 +169,75 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                         onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
                       />
                     </div>
+
+                    <div className="space-y-4">
+                      <Label>Personalização do Texto</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Cor do Texto</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            {[
+                              { color: '#000000', name: 'Preto' },
+                              { color: '#4b5563', name: 'Cinza Escuro' },
+                              { color: '#2563eb', name: 'Azul' },
+                              { color: '#dc2626', name: 'Vermelho' },
+                              { color: '#ffffff', name: 'Branco' },
+                            ].map((preset) => (
+                              <button
+                                key={preset.color}
+                                type="button"
+                                onClick={() => setNewNote({ ...newNote, fontColor: preset.color })}
+                                className={`h-6 w-6 rounded-full border shadow-sm transition-transform hover:scale-110 ${newNote.fontColor === preset.color ? 'ring-2 ring-primary ring-offset-2' : ''
+                                  }`}
+                                style={{ backgroundColor: preset.color }}
+                                title={preset.name}
+                              />
+                            ))}
+                            <input
+                              type="color"
+                              value={newNote.fontColor}
+                              onChange={(e) => setNewNote({ ...newNote, fontColor: e.target.value })}
+                              className="h-6 w-6 rounded-full p-0 border-0 overflow-hidden cursor-pointer"
+                              title="Cor personalizada"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground block mb-2">Ajuste de Tamanho</Label>
+                          <div className="flex items-center gap-2 mb-2">
+                            <input
+                              type="checkbox"
+                              id="auto-fit"
+                              checked={newNote.isAutoFit}
+                              onChange={(e) => setNewNote({ ...newNote, isAutoFit: e.target.checked })}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <Label htmlFor="auto-fit" className="cursor-pointer text-sm font-medium">Auto-ajustar ao espaço</Label>
+                          </div>
+
+                          {!newNote.isAutoFit && (
+                            <div className="flex gap-2">
+                              {['small', 'medium', 'large'].map((size) => (
+                                <button
+                                  key={size}
+                                  type="button"
+                                  onClick={() => setNewNote({ ...newNote, fontSize: size as any })}
+                                  className={`h-8 w-8 rounded border flex items-center justify-center transition-colors ${newNote.fontSize === size
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-background hover:bg-muted'
+                                    }`}
+                                  title={`Tamanho ${size === 'small' ? 'Pequeno' : size === 'medium' ? 'Médio' : 'Grande'}`}
+                                >
+                                  <span className={size === 'small' ? 'text-xs' : size === 'medium' ? 'text-sm' : 'text-lg'}>A</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="note-content">Conteúdo</Label>
                       <Textarea
@@ -166,12 +246,21 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                         value={newNote.content}
                         onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
                         rows={4}
+                        className={`transition-all duration-300 ${newNote.isAutoFit
+                          ? newNote.content.length < 50 ? 'text-2xl font-semibold' : newNote.content.length < 100 ? 'text-lg' : 'text-sm'
+                          : newNote.fontSize === 'small' ? 'text-xs' : newNote.fontSize === 'large' ? 'text-lg' : 'text-sm'
+                          }`}
+                        style={{
+                          backgroundColor: newNote.color,
+                          color: newNote.fontColor
+                        }}
                       />
                     </div>
+
                     <Button onClick={handleAddNote} className="w-full">
                       Adicionar Post-it
                     </Button>
-                  </TabsContent>
+                  </div>
                 </Tabs>
               </DialogContent>
             </Dialog>
@@ -220,19 +309,36 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                       )}
                     </div>
                   ) : (
-                    <CardContent className="pt-6 pb-4 bg-gradient-to-br from-yellow-100 to-yellow-200 dark:from-yellow-900/30 dark:to-yellow-800/30 min-h-[200px] relative">
+                    <CardContent
+                      className={`pt-6 pb-4 min-h-[200px] relative transition-colors duration-300 ${item.isAutoFit ? 'flex flex-col justify-center items-center text-center' : ''
+                        }`}
+                      style={{ backgroundColor: item.color || '#fef3c7' }}
+                    >
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
                         onClick={() => handleDelete(item.id)}
                       >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Trash2 className="w-4 h-4 text-gray-700" />
                       </Button>
+
                       {item.title && (
-                        <h4 className="font-semibold mb-2 text-yellow-900 dark:text-yellow-100">{item.title}</h4>
+                        <h4 className={`font-bold mb-3 text-gray-900 border-b border-black/10 pb-2 ${item.isAutoFit ? 'w-full text-left absolute top-4 left-4 right-12 border-none' : ''
+                          }`}>
+                          {item.title}
+                        </h4>
                       )}
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200 whitespace-pre-wrap">{item.content}</p>
+
+                      <p
+                        className={`whitespace-pre-wrap transition-all duration-300 w-full ${item.isAutoFit
+                          ? (item.content.length < 30 ? 'text-3xl font-bold leading-tight' : item.content.length < 80 ? 'text-xl font-semibold' : 'text-base')
+                          : (item.fontSize === 'small' ? 'text-xs' : item.fontSize === 'large' ? 'text-lg leading-relaxed' : 'text-sm')
+                          } ${item.isAutoFit && item.title ? 'mt-8' : ''}`}
+                        style={{ color: item.fontColor || '#000000' }}
+                      >
+                        {item.content}
+                      </p>
                     </CardContent>
                   )}
                 </Card>

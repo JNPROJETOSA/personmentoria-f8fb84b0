@@ -18,7 +18,8 @@ All colors MUST be HSL.
     --popover-foreground: 215 25% 27%;
 
     /* Brand Colors */
-    --primary: 173 58% 39%; /* Teal #0d9488 */
+    --primary: 173 58% 39%;
+    /* Teal #0d9488 */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 214 32% 91%;
@@ -27,7 +28,8 @@ All colors MUST be HSL.
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 25 95% 53%; /* Accent Orange #f97316 */
+    --accent: 25 95% 53%;
+    /* Accent Orange #f97316 */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -49,22 +51,34 @@ All colors MUST be HSL.
     --sidebar-ring: 173 58% 39%;
 
     /* Medical area colors */
-    --medical-pediatria: 217 91% 60%; /* Blue Royal #3B82F6 */
-    --medical-go: 330 81% 60%; /* Pink #EC4899 */
-    --medical-preventiva: 160 84% 39%; /* Emerald #10B981 */
-    --medical-clinica: 38 92% 50%; /* Amber #F59E0B */
-    --medical-cirurgia: 239 84% 67%; /* Indigo #6366F1 */
+    --medical-pediatria: 217 91% 60%;
+    /* Blue Royal #3B82F6 */
+    --medical-go: 330 81% 60%;
+    /* Pink #EC4899 */
+    --medical-cirurgia: 160 84% 39%;
+    /* Emerald #10B981 */
+    --medical-clinica: 38 92% 50%;
+    /* Amber #F59E0B */
+    --medical-preventiva: 271 91% 65%;
+    /* Purple #A855F7 */
 
     /* Performance Semaphore Colors */
-    --success: 160 84% 39%; /* Emerald Green >80% */
-    --warning: 38 92% 50%; /* Amber 60-79% */
-    --danger: 0 84% 60%; /* Red <60% */
+    --success: 160 84% 39%;
+    /* Emerald Green >80% */
+    --warning: 38 92% 50%;
+    /* Amber 60-79% */
+    --danger: 0 84% 60%;
+    /* Red <60% */
 
     /* Heatmap Scale (Teal monochromatic) */
-    --heatmap-empty: 210 40% 96%; /* Slate-100 */
-    --heatmap-low: 173 76% 70%; /* Teal-200 */
-    --heatmap-medium: 173 58% 50%; /* Teal-400 */
-    --heatmap-high: 173 58% 39%; /* Teal-600 */
+    --heatmap-empty: 210 40% 96%;
+    /* Slate-100 */
+    --heatmap-low: 173 76% 70%;
+    /* Teal-200 */
+    --heatmap-medium: 173 58% 50%;
+    /* Teal-400 */
+    --heatmap-high: 173 58% 39%;
+    /* Teal-600 */
 
     /* Charts and data viz */
     --chart-1: 217 91% 60%;
@@ -75,10 +89,13 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222 47% 11%; /* Slate-950 not pure black */
-    --foreground: 210 40% 96%; /* Slate-100 not pure white */
+    --background: 222 47% 11%;
+    /* Slate-950 not pure black */
+    --foreground: 210 40% 96%;
+    /* Slate-100 not pure white */
 
-    --card: 222 47% 17%; /* Slate-900 */
+    --card: 222 47% 17%;
+    /* Slate-900 */
     --card-foreground: 210 40% 96%;
 
     --popover: 222 47% 11%;
@@ -116,9 +133,9 @@ All colors MUST be HSL.
     /* Medical area colors (same) */
     --medical-pediatria: 217 91% 60%;
     --medical-go: 330 81% 60%;
-    --medical-preventiva: 160 84% 39%;
+    --medical-cirurgia: 160 84% 39%;
     --medical-clinica: 38 92% 50%;
-    --medical-cirurgia: 239 84% 67%;
+    --medical-preventiva: 271 91% 65%;
 
     /* Performance Semaphore Colors (adjusted for dark) */
     --success: 160 84% 45%;
@@ -155,15 +172,19 @@ All colors MUST be HSL.
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
 }
 
 @keyframes shimmer-bar {
-  0%, 100% {
+
+  0%,
+  100% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
@@ -173,6 +194,7 @@ All colors MUST be HSL.
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(200%);
   }
@@ -210,7 +232,10 @@ All colors MUST be HSL.
 }
 
 /* Custom visibility rules */
-a[href="lovable.dev"], iframe[src*="lovable.dev"], div[style*="Edit with Lovable"], .lovable-badge {
+a[href="lovable.dev"],
+iframe[src*="lovable.dev"],
+div[style*="Edit with Lovable"],
+.lovable-badge {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;

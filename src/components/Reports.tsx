@@ -8,7 +8,9 @@ import { ExerciseLog, ClassItem, ExamLog, MedicalArea } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 import { getPerformanceColor } from '@/lib/utils';
+import { saveAs } from 'file-saver';
 
 interface ReportsProps {
   exercises: ExerciseLog[];
@@ -22,13 +24,13 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
     date.setDate(date.getDate() - 30);
     return date.toISOString().split('T')[0];
   });
-  
+
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const generateReport = () => {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     if (start > end) {
       toast({
         title: "Período inválido",
@@ -90,13 +92,13 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       // Barra superior Perry Teal
       pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
       pdf.rect(0, 0, pageWidth, 25, 'F');
-      
+
       // Título em branco
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(255, 255, 255);
       pdf.text('Mentoria Regisdência - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
-      
+
       // Subtítulo de período
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
@@ -114,7 +116,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       // Fundo cinza suave com bordas arredondadas
       pdf.setFillColor(245, 247, 250);
       pdf.roundedRect(14, yPosition, pageWidth - 28, 35, 3, 3, 'F');
-      
+
       // Borda sutil
       pdf.setDrawColor(220, 220, 220);
       pdf.setLineWidth(0.5);
@@ -124,16 +126,16 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(100, 100, 100);
-      
+
       const kpiX = 25;
       const kpiSpacing = 55;
-      
+
       // Questões Totais
       pdf.text('QUESTÕES TOTAIS', kpiX, yPosition + 10);
       pdf.setFontSize(24);
       pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
       pdf.text(totalQuestions.toString(), kpiX, yPosition + 23);
-      
+
       // Acertos
       pdf.setFontSize(10);
       pdf.setTextColor(100, 100, 100);
@@ -141,7 +143,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       pdf.setFontSize(24);
       pdf.setTextColor(16, 185, 129); // Emerald
       pdf.text(totalCorrect.toString(), kpiX + kpiSpacing, yPosition + 23);
-      
+
       // Aproveitamento
       pdf.setFontSize(10);
       pdf.setTextColor(100, 100, 100);
@@ -160,7 +162,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
         const areaExercises = filteredExercises.filter(ex => ex.area === area);
         const total = areaExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
         const correct = areaExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
-        
+
         return {
           area,
           total,
@@ -327,8 +329,10 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       // 7. RODAPÉ (Footer) - Add to all pages
       addFooter();
 
-      // Save PDF
-      pdf.save(`Mentoria_Regisdencia_Relatorio_${startDate}_a_${endDate}.pdf`);
+      // Using FileSaver.js for cross-browser compatibility
+      const finalFilename = `Mentoria_Regisdencia_Relatorio_${startDate}_a_${endDate}.pdf`;
+      const blob = pdf.output('blob');
+      saveAs(blob, finalFilename);
 
       toast({
         title: "Relatório gerado com sucesso!",
@@ -359,7 +363,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
     const areaExercises = filteredExercises.filter(ex => ex.area === area);
     const total = areaExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
     const correct = areaExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
-    
+
     return {
       area,
       total,

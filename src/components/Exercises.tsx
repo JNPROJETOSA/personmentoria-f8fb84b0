@@ -19,12 +19,12 @@ interface ExercisesProps {
   onAutoCompleteReview?: (topic: string) => void;
 }
 
-export default function Exercises({ 
-  exercises, 
-  addExercise, 
-  deleteExercise, 
+export default function Exercises({
+  exercises,
+  addExercise,
+  deleteExercise,
   classes = [],
-  onAutoCompleteReview 
+  onAutoCompleteReview
 }: ExercisesProps) {
   const isMountedRef = useRef(true);
   const [topicInputMode, setTopicInputMode] = useState<'manual' | 'class'>('manual');
@@ -44,9 +44,9 @@ export default function Exercises({
     };
   }, []);
 
-  // Filter studied classes by selected area
-  const filteredStudiedClasses = useMemo(() => {
-    return classes.filter(c => c.studied && c.area === newExercise.area);
+  // Filter classes by selected area - REMOVED 'studied' filter to allow linking to any class
+  const filteredClasses = useMemo(() => {
+    return classes.filter(c => c.area === newExercise.area);
   }, [classes, newExercise.area]);
 
   // When area changes, reset class selection
@@ -110,12 +110,12 @@ export default function Exercises({
     };
 
     await addExercise(item);
-    
+
     // Auto-complete review for this topic if callback provided
     if (onAutoCompleteReview) {
       onAutoCompleteReview(item.topic);
     }
-    
+
     if (!isMountedRef.current) return;
 
     const accuracy = (item.correctAnswers / item.totalQuestions) * 100;
@@ -189,8 +189,8 @@ export default function Exercises({
             <div className="space-y-2 lg:col-span-3">
               <Label>Tópico</Label>
               <div className="space-y-3">
-                <RadioGroup 
-                  value={topicInputMode} 
+                <RadioGroup
+                  value={topicInputMode}
                   onValueChange={(v) => {
                     setTopicInputMode(v as 'manual' | 'class');
                     if (v === 'manual') {
@@ -218,24 +218,24 @@ export default function Exercises({
                     onChange={(e) => setNewExercise({ ...newExercise, topic: e.target.value })}
                   />
                 ) : (
-                  <Select 
-                    value={selectedClassId} 
+                  <Select
+                    value={selectedClassId}
                     onValueChange={setSelectedClassId}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={
-                        filteredStudiedClasses.length === 0 
-                          ? "Nenhuma aula estudada nesta área" 
-                          : "Selecione uma aula estudada"
+                        filteredClasses.length === 0
+                          ? "Nenhuma aula nesta área"
+                          : "Selecione uma aula"
                       } />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredStudiedClasses.length === 0 ? (
+                      {filteredClasses.length === 0 ? (
                         <SelectItem value="none" disabled>
-                          Nenhuma aula estudada em {newExercise.area}
+                          Nenhuma aula em {newExercise.area}
                         </SelectItem>
                       ) : (
-                        filteredStudiedClasses.map(cls => (
+                        filteredClasses.map(cls => (
                           <SelectItem key={cls.id} value={cls.id}>
                             {cls.title}
                           </SelectItem>

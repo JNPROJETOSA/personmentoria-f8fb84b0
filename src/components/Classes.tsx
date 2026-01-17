@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ClassItem, MedicalArea } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface ClassesProps {
   classes: ClassItem[];
@@ -25,6 +26,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     studied: false,
     priority: 2
   });
+  const [classToDelete, setClassToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -54,7 +56,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     };
 
     await addClass(item);
-    
+
     if (!isMountedRef.current) return;
 
     setNewClass({
@@ -64,7 +66,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
       studied: false,
       priority: 2
     });
-    
+
     toast({
       title: "Aula adicionada!",
       description: `"${item.title}" foi registrada.`,
@@ -84,13 +86,16 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     }
   };
 
-  const handleDelete = async (id: string) => {
-    await deleteClass(id);
-    if (isMountedRef.current) {
-      toast({
-        title: "Aula removida",
-        description: "A aula foi excluída com sucesso.",
-      });
+  const confirmDelete = async () => {
+    if (classToDelete) {
+      await deleteClass(classToDelete);
+      setClassToDelete(null);
+      if (isMountedRef.current) {
+        toast({
+          title: "Aula removida",
+          description: "A aula foi excluída com sucesso.",
+        });
+      }
     }
   };
 
@@ -108,11 +113,10 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
 
   const ClassCard = ({ cls, isStudied }: { cls: ClassItem; isStudied: boolean }) => (
     <div
-      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-        isStudied 
-          ? 'bg-muted/50 border-muted' 
+      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${isStudied
+          ? 'bg-muted/50 border-muted'
           : 'bg-card hover:bg-accent/50'
-      }`}
+        }`}
     >
       <Button
         variant={isStudied ? "secondary" : "outline"}
@@ -123,7 +127,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
       >
         <CheckCircle2 className="w-4 h-4" />
       </Button>
-      
+
       <div className="flex-1 min-w-0">
         <span className={`block font-medium ${isStudied ? 'text-muted-foreground' : ''}`}>
           {cls.title}
@@ -148,7 +152,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => handleDelete(cls.id)}
+        onClick={() => setClassToDelete(cls.id)}
         className="text-destructive hover:text-destructive hover:bg-destructive/10"
       >
         <Trash2 className="w-4 h-4" />
@@ -205,8 +209,8 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
 
             <div className="space-y-2">
               <Label htmlFor="priority">Prioridade</Label>
-              <Select 
-                value={String(newClass.priority)} 
+              <Select
+                value={String(newClass.priority)}
                 onValueChange={(value) => setNewClass({ ...newClass, priority: Number(value) as 1 | 2 | 3 })}
               >
                 <SelectTrigger id="priority">
@@ -280,6 +284,23 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={!!classToDelete} onOpenChange={(open) => !open && setClassToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Aula</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta aula? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

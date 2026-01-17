@@ -6,7 +6,7 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode' | 'profile-settings' | 'admin';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode' | 'profile-settings' | 'admin' | 'mind-maps';
 
 export interface Flashcard {
   id: string;
@@ -25,6 +25,10 @@ export interface DreamBoardItem {
   type: 'image' | 'note';
   content: string; // URL for image, text for note
   title?: string;
+  color?: string; // Hex code or preset
+  fontColor?: string; // Hex code or preset
+  fontSize?: 'small' | 'medium' | 'large';
+  isAutoFit?: boolean;
   createdAt: string;
 }
 

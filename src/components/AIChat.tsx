@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, BrainCircuit, Loader2 } from 'lucide-react';
+import { Send, BrainCircuit, Loader2, Plus, MessageSquare, Trash2, History, Menu } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,11 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';
 import ReactMarkdown from 'react-markdown';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { useChatHistory, Message } from '@/hooks/useChatHistory';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface AIChatProps {
   exercises: ExerciseLog[];
@@ -21,30 +19,39 @@ interface AIChatProps {
 }
 
 export default function AIChat({ exercises, classes }: AIChatProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Olá! Sou o **TUTOR REGIS** 🎓, seu assistente de estudos para residência médica. \n\nPosso te ajudar com:\n- 📊 Análise do seu desempenho\n- 💡 Sugestões de estudo personalizadas\n- 📚 Dúvidas sobre temas médicos\n- 🎯 Estratégias de revisão\n\nComo posso te ajudar hoje?'
-    }
-  ]);
+  const {
+    sessions,
+    currentSession,
+    currentSessionId,
+    setCurrentSessionId,
+    createNewChat,
+    deleteChat,
+    updateCurrentChat
+  } = useChatHistory();
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // Mobile toggle
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const { profile } = useProfile(user?.id);
 
+  // Auto-scroll when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [currentSession?.messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !currentSession) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...currentSession.messages, userMessage];
+
+    // Optimistic update
+    updateCurrentChat(updatedMessages);
     setInput('');
     setIsLoading(true);
 
@@ -65,10 +72,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
-            messages: [...messages, userMessage].map(m => ({
-              role: m.role,
-              content: m.content
-            })),
+            messages: updatedMessages,
             userData,
           }),
         }
@@ -93,7 +97,8 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
       let assistantContent = '';
 
       // Create assistant message placeholder
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      const withAssistantPlaceholder = [...updatedMessages, { role: 'assistant', content: '' } as Message];
+      updateCurrentChat(withAssistantPlaceholder);
 
       let textBuffer = '';
       let streamDone = false;
@@ -101,7 +106,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
       while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         textBuffer += decoder.decode(value, { stream: true });
 
         let newlineIndex: number;
@@ -124,14 +129,11 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (content) {
               assistantContent += content;
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: 'assistant',
-                  content: assistantContent
-                };
-                return updated;
-              });
+              // Real-time update to specific session
+              updateCurrentChat([
+                ...updatedMessages,
+                { role: 'assistant', content: assistantContent }
+              ]);
             }
           } catch {
             textBuffer = line + '\n' + textBuffer;
@@ -147,15 +149,10 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
         description: error instanceof Error ? error.message : 'Tente novamente em alguns instantes.',
         variant: 'destructive',
       });
-      
+
       // Remove empty assistant message if error occurred
-      setMessages(prev => {
-        const updated = [...prev];
-        if (updated[updated.length - 1]?.content === '') {
-          updated.pop();
-        }
-        return updated;
-      });
+      updateCurrentChat(updatedMessages);
+
     } finally {
       setIsLoading(false);
     }
@@ -169,31 +166,107 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <Card className="h-[calc(100vh-6rem)]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BrainCircuit className="w-5 h-5 text-primary" />
-            TUTOR REGIS
-          </CardTitle>
-          <CardDescription>
-            Assistente inteligente com IA especializado em residência médica
-          </CardDescription>
+    <div className="flex h-[calc(100vh-6rem)] gap-4 animate-in fade-in duration-500">
+      {/* History Sidebar - Desktop: Always visible, Mobile: Toggleable */}
+      <Card className={`flex-col w-80 shrink-0 ${isHistoryOpen ? 'flex absolute z-20 h-full left-0 top-0 shadow-2xl' : 'hidden md:flex'}`}>
+        <CardHeader className="pb-3 border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Histórico
+            </CardTitle>
+            <Button size="sm" variant="outline" onClick={createNewChat}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Chat
+            </Button>
+            {isHistoryOpen && (
+              <Button size="icon" variant="ghost" className="md:hidden" onClick={() => setIsHistoryOpen(false)}>
+                <Menu className="w-5 h-5" />
+              </Button>
+            )}
+          </div>
         </CardHeader>
-        <CardContent className="flex flex-col h-[calc(100%-8rem)]">
-          <ScrollArea ref={scrollRef} className="flex-1 pr-4 mb-4">
-            <div className="space-y-4">
-              {messages.map((message, index) => (
+        <CardContent className="flex-1 p-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="flex flex-col p-2 gap-1">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  onClick={() => {
+                    setCurrentSessionId(session.id);
+                    setIsHistoryOpen(false); // Close on mobile selection
+                  }}
+                  className={`flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors group ${currentSessionId === session.id
+                      ? 'bg-primary/10 hover:bg-primary/15'
+                      : 'hover:bg-muted'
+                    }`}
+                >
+                  <div className="flex flex-col flex-1 min-w-0 mr-2">
+                    <span className={`text-sm font-medium truncate ${currentSessionId === session.id ? 'text-primary' : ''}`}>
+                      {session.title || 'Nova Conversa'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(session.date), "d 'de' MMM, HH:mm", { locale: ptBR })}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => deleteChat(session.id, e)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              {sessions.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhuma conversa salva
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Main Chat Area */}
+      <Card className="flex-1 flex flex-col min-w-0">
+        <CardHeader className="border-b py-3 md:py-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden -ml-2"
+              onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <BrainCircuit className="w-5 h-5 text-primary shrink-0" />
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-lg truncate">TUTOR REGIS</CardTitle>
+              <CardDescription className="truncate hidden sm:block">
+                Assistente inteligente com IA especializado em residência médica
+              </CardDescription>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 md:hidden" onClick={createNewChat}>
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="flex flex-col flex-1 p-0 overflow-hidden relative">
+          <ScrollArea ref={scrollRef} className="flex-1 p-4">
+            <div className="space-y-4 pb-4">
+              {currentSession?.messages.map((message, index) => (
                 <div
                   key={index}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg p-4 ${
-                      message.role === 'user'
+                    className={`max-w-[85%] sm:max-w-[80%] rounded-lg p-4 ${message.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
-                    }`}
+                      }`}
                   >
                     {message.role === 'assistant' && (
                       <div className="flex items-center gap-2 mb-2">
@@ -202,16 +275,16 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
                       </div>
                     )}
                     {message.role === 'assistant' ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <div className="prose prose-sm dark:prose-invert max-w-none break-words">
                         <ReactMarkdown>{message.content}</ReactMarkdown>
                       </div>
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                     )}
                   </div>
                 </div>
               ))}
-              
+
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%] rounded-lg p-4 bg-muted">
@@ -222,72 +295,69 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
                   </div>
                 </div>
               )}
+
+              {currentSession?.messages.length === 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-8 px-2 md:px-8">
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left h-auto py-3 whitespace-normal"
+                    onClick={() => setInput('Analise meu desempenho geral e sugira áreas para focar')}
+                    disabled={isLoading}
+                  >
+                    📊 Análise do meu desempenho
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left h-auto py-3 whitespace-normal"
+                    onClick={() => setInput('Quais tópicos devo revisar com base nas minhas notas?')}
+                    disabled={isLoading}
+                  >
+                    🎯 Sugestões de revisão
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left h-auto py-3 whitespace-normal"
+                    onClick={() => setInput('Me explique técnicas de memorização para residência médica')}
+                    disabled={isLoading}
+                  >
+                    🧠 Técnicas de estudo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start text-left h-auto py-3 whitespace-normal"
+                    onClick={() => setInput('Como organizar meu cronograma de estudos?')}
+                    disabled={isLoading}
+                  >
+                    📅 Organização de estudos
+                  </Button>
+                </div>
+              )}
             </div>
           </ScrollArea>
 
-          <div className="flex gap-2">
-            <Textarea
-              placeholder="Digite sua pergunta..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-              className="min-h-[60px] max-h-[120px]"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              size="icon"
-              className="shrink-0 h-[60px] w-[60px]"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Sugestões de perguntas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Analise meu desempenho geral e sugira áreas para focar')}
-              disabled={isLoading}
-            >
-              📊 Análise do meu desempenho
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Quais tópicos devo revisar com base nas minhas notas?')}
-              disabled={isLoading}
-            >
-              🎯 Sugestões de revisão
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Me explique técnicas de memorização para residência médica')}
-              disabled={isLoading}
-            >
-              🧠 Técnicas de estudo
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start text-left h-auto py-3"
-              onClick={() => setInput('Como organizar meu cronograma de estudos?')}
-              disabled={isLoading}
-            >
-              📅 Organização de estudos
-            </Button>
+          <div className="p-4 border-t bg-background mt-auto">
+            <div className="flex gap-2 max-w-4xl mx-auto w-full">
+              <Textarea
+                placeholder="Digite sua pergunta..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
+                className="min-h-[50px] max-h-[120px] resize-none"
+              />
+              <Button
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+                size="icon"
+                className="shrink-0 h-[50px] w-[50px]"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

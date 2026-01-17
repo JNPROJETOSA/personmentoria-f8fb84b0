@@ -8,6 +8,7 @@ import { NotebookData, MedicalArea } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 
 interface NotebookProps {
   data: NotebookData;
@@ -37,7 +38,7 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
 
   const saveAllChanges = async () => {
     setIsSaving(true);
-    
+
     // Save all areas with content
     const savePromises = Object.entries(localData).map(([area, content]) => {
       return onUpdate(area as MedicalArea, content);
@@ -45,7 +46,7 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
 
     try {
       await Promise.all(savePromises);
-      
+
       if (isMountedRef.current) {
         setHasUnsavedChanges(false);
         toast({
@@ -76,7 +77,7 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     saveTimeoutRef.current = setTimeout(() => {
       onUpdate(area, content);
       if (isMountedRef.current) {
@@ -92,49 +93,49 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 20;
       const maxWidth = pageWidth - (margin * 2);
-      
+
       // Perry Teal header
       const perryTeal: [number, number, number] = [13, 148, 136];
       pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
       pdf.rect(0, 0, pageWidth, 25, 'F');
-      
+
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(255, 255, 255);
       pdf.text('Mentoria Regisdência - Caderno de Erros', pageWidth / 2, 15, { align: 'center' });
-      
+
       let yPosition = 40;
-      
+
       // Add each area's notes
       Object.values(MedicalArea).forEach((area) => {
         const content = localData[area];
         if (!content || content.trim().length === 0) return;
-        
+
         // Check if we need a new page
         if (yPosition > pageHeight - 60) {
           pdf.addPage();
           yPosition = 20;
         }
-        
+
         // Area header with color
         const rgb = AREA_COLORS[area].match(/\w\w/g)?.map(x => parseInt(x, 16)) as [number, number, number];
         if (rgb) {
           pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
           pdf.roundedRect(margin, yPosition, maxWidth, 12, 2, 2, 'F');
         }
-        
+
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(255, 255, 255);
         pdf.text(area, margin + 5, yPosition + 8);
-        
+
         yPosition += 20;
-        
+
         // Content
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(60, 60, 60);
-        
+
         const lines = pdf.splitTextToSize(content, maxWidth);
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 20) {
@@ -144,10 +145,10 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
           pdf.text(line, margin, yPosition);
           yPosition += 6;
         });
-        
+
         yPosition += 10;
       });
-      
+
       // Footer on all pages
       const pageCount = (pdf as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
@@ -161,9 +162,9 @@ export default function Notebook({ data, onUpdate }: NotebookProps) {
           { align: 'center' }
         );
       }
-      
-      pdf.save(`Mentoria_Regisdencia_Caderno_de_Erros_${new Date().toISOString().split('T')[0]}.pdf`);
-      
+
+      savePdf(pdf, `Mentoria_Regisdencia_Caderno_de_Erros_${new Date().toISOString().split('T')[0]}`);
+
       toast({
         title: "PDF gerado com sucesso!",
         description: "Seu caderno de erros foi exportado.",
@@ -244,8 +245,8 @@ Exemplos:
           </Tabs>
 
           <div className="flex gap-3 mt-6">
-            <Button 
-              onClick={saveAllChanges} 
+            <Button
+              onClick={saveAllChanges}
               disabled={!hasUnsavedChanges || isSaving}
               className="flex-1"
             >

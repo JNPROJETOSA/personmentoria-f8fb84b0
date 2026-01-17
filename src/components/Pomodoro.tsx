@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Settings } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
+import { usePomodoroSettings } from '@/hooks/usePomodoroSettings';
 
 type PomodoroMode = 'focus' | 'short-break' | 'long-break';
 
@@ -14,28 +15,49 @@ export default function Pomodoro() {
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [task, setTask] = useState('');
-  const [settings, setSettings] = useState({
+
+  // Use Custom Hook for persistence
+  const { settings: savedSettings, loading, saveSettings } = usePomodoroSettings();
+
+  // Local state for the slider, initialized with saved settings
+  const [localSettings, setLocalSettings] = useState({
     focus: 25,
     shortBreak: 5,
     longBreak: 15
   });
-  
+
+  // Sync local settings when saved settings load
+  useEffect(() => {
+    if (!loading) {
+      setLocalSettings(savedSettings);
+
+      // Also update current timer if not running
+      if (!isRunning) {
+        if (mode === 'focus') setTimeLeft(savedSettings.focus * 60);
+        if (mode === 'short-break') setTimeLeft(savedSettings.shortBreak * 60);
+        if (mode === 'long-break') setTimeLeft(savedSettings.longBreak * 60);
+      }
+    }
+  }, [savedSettings, loading]); // Remove 'mode' dependency to avoid resetting timer on mode switch if running
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBiqF0fPTgjMGHm7A7+OZRQ0PVa3n77FdGAU+mejxw2sjBC+D0fLWhTUHImzB7uSXSQ0PV67n8LNfGQVAnerzxG4kBSuE0/PYhzYIIW/D7eSZSQ0OVrDn8LRgGQU+mujywm8kBS2E1PPaiDcII3DD7uSaSg0NVrHo8bVgGgVBnOjywXAjBS+F1PPaizgJJHLE7uSbSw0NV7Lo8LVhGwVCnerywnAkBjCG1PPaizgKJXTE7+WcTA0MWLP='
-);
+    );
   }, []);
 
   const durations = {
-    focus: settings.focus * 60,
-    'short-break': settings.shortBreak * 60,
-    'long-break': settings.longBreak * 60
+    focus: localSettings.focus * 60,
+    'short-break': localSettings.shortBreak * 60,
+    'long-break': localSettings.longBreak * 60
   };
 
   useEffect(() => {
-    setTimeLeft(durations[mode]);
-  }, [mode, settings]);
+    if (!isRunning) {
+      setTimeLeft(durations[mode]);
+    }
+  }, [mode, localSettings]); // Update when mode changes or settings change (if not running)
 
   useEffect(() => {
     if (!isRunning) return;
@@ -63,6 +85,10 @@ export default function Pomodoro() {
     setTimeLeft(durations[mode]);
   };
 
+  const handleSaveSettings = () => {
+    saveSettings(localSettings);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <Card>
@@ -81,36 +107,51 @@ export default function Pomodoro() {
                 </DialogHeader>
                 <div className="space-y-6 py-4">
                   <div className="space-y-2">
-                    <Label>Foco (minutos): {settings.focus}</Label>
+                    <div className="flex justify-between">
+                      <Label>Foco</Label>
+                      <span className="text-sm text-muted-foreground">{localSettings.focus} min</span>
+                    </div>
                     <Slider
-                      value={[settings.focus]}
-                      onValueChange={([v]) => setSettings(s => ({ ...s, focus: v }))}
+                      value={[localSettings.focus]}
+                      onValueChange={([v]) => setLocalSettings(s => ({ ...s, focus: v }))}
                       min={1}
                       max={60}
                       step={1}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Pausa Curta (minutos): {settings.shortBreak}</Label>
+                    <div className="flex justify-between">
+                      <Label>Pausa Curta</Label>
+                      <span className="text-sm text-muted-foreground">{localSettings.shortBreak} min</span>
+                    </div>
                     <Slider
-                      value={[settings.shortBreak]}
-                      onValueChange={([v]) => setSettings(s => ({ ...s, shortBreak: v }))}
+                      value={[localSettings.shortBreak]}
+                      onValueChange={([v]) => setLocalSettings(s => ({ ...s, shortBreak: v }))}
                       min={1}
                       max={15}
                       step={1}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Pausa Longa (minutos): {settings.longBreak}</Label>
+                    <div className="flex justify-between">
+                      <Label>Pausa Longa</Label>
+                      <span className="text-sm text-muted-foreground">{localSettings.longBreak} min</span>
+                    </div>
                     <Slider
-                      value={[settings.longBreak]}
-                      onValueChange={([v]) => setSettings(s => ({ ...s, longBreak: v }))}
+                      value={[localSettings.longBreak]}
+                      onValueChange={([v]) => setLocalSettings(s => ({ ...s, longBreak: v }))}
                       min={5}
                       max={30}
                       step={1}
                     />
                   </div>
                 </div>
+                <DialogFooter>
+                  <Button onClick={handleSaveSettings} className="w-full sm:w-auto">
+                    <Save className="w-4 h-4 mr-2" />
+                    Salvar como Padrão
+                  </Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </CardTitle>

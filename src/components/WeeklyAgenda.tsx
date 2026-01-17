@@ -15,28 +15,114 @@ interface WeeklyAgendaProps {
   isAdminView?: boolean;
 }
 
+interface TimeBlock {
+  start: string;
+  end: string;
+  description: string;
+  originalIndex: number; // To track position in the main array
+  isCompleted: boolean;
+}
+
+// Helper to parse a task string which might be JSON or plain text
+const parseTask = (taskString: string, index: number, completedIndices: number[] = []): TimeBlock => {
+  try {
+    const parsed = JSON.parse(taskString);
+    if (typeof parsed === 'object' && parsed !== null && 'start' in parsed && 'end' in parsed) {
+      return {
+        start: parsed.start,
+        end: parsed.end,
+        description: parsed.description || parsed.task || '', // back-compat with plan thought
+        originalIndex: index,
+        isCompleted: completedIndices.includes(index)
+      };
+    }
+  } catch (e) {
+    // Not JSON, treat as legacy
+  }
+
+  return {
+    start: '',
+    end: '',
+    description: taskString,
+    originalIndex: index,
+    isCompleted: completedIndices.includes(index)
+  };
+};
+
+const serializeTask = (block: Omit<TimeBlock, 'originalIndex' | 'isCompleted'>): string => {
+  return JSON.stringify({
+    start: block.start,
+    end: block.end,
+    description: block.description
+  });
+};
+
 export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps) {
   const { agenda, loading, updateDayTasks, toggleTaskCompletion } = useWeeklyAgenda(userId);
   const [editingDay, setEditingDay] = useState<number | null>(null);
-  const [newTask, setNewTask] = useState('');
+
+  // New Task State
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskStart, setNewTaskStart] = useState('');
+  const [newTaskEnd, setNewTaskEnd] = useState('');
+
+  // Editing Task State
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
-  const [editingTaskValue, setEditingTaskValue] = useState('');
+  const [editingTaskDescription, setEditingTaskDescription] = useState('');
+  const [editingTaskStart, setEditingTaskStart] = useState('');
+  const [editingTaskEnd, setEditingTaskEnd] = useState('');
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   const today = new Date().getDay();
 
+  // Helper to get next available time slot
+  const getNextTimeSlot = (dayTasks: string[]) => {
+    const blocks = dayTasks
+      .map((t, i) => parseTask(t, i))
+      .filter(b => b.end)
+      .sort((a, b) => a.end.localeCompare(b.end));
+
+    if (blocks.length > 0) {
+      const lastBlock = blocks[blocks.length - 1];
+      // Default duration: 1 hour
+      const nextStart = lastBlock.end;
+      const [hours, minutes] = nextStart.split(':').map(Number);
+      const nextEndData = new Date();
+      nextEndData.setHours(hours + 1, minutes);
+      const nextEnd = format(nextEndData, 'HH:mm');
+      return { start: nextStart, end: nextEnd };
+    }
+
+    return { start: '08:00', end: '09:00' };
+  };
+
   const handleAddTask = async (dayOfWeek: number) => {
-    if (!newTask.trim() || !agenda) return;
-    
+    if (!newTaskDescription.trim() || !agenda) return;
+
+    const taskString = serializeTask({
+      start: newTaskStart,
+      end: newTaskEnd,
+      description: newTaskDescription.trim()
+    });
+
     const dayAgenda = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
     const currentTasks = dayAgenda?.tasks || [];
-    await updateDayTasks(dayOfWeek, [...currentTasks, newTask.trim()]);
-    setNewTask('');
+    await updateDayTasks(dayOfWeek, [...currentTasks, taskString]);
+
+    setNewTaskDescription('');
+    // Auto-advance time slots for next entry
+    if (newTaskEnd) {
+      setNewTaskStart(newTaskEnd);
+      const [h, m] = newTaskEnd.split(':').map(Number);
+      const nextEnd = new Date();
+      nextEnd.setHours(h + 1, m);
+      setNewTaskEnd(format(nextEnd, 'HH:mm'));
+    }
   };
 
   const handleRemoveTask = async (dayOfWeek: number, taskIndex: number) => {
     if (!agenda) return;
-    
+
     const dayAgenda = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
     const currentTasks = dayAgenda?.tasks || [];
     const currentCompleted = dayAgenda?.completedIndices || [];
@@ -49,20 +135,32 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
   };
 
   const handleEditTask = async (dayOfWeek: number, taskIndex: number) => {
-    if (!editingTaskValue.trim() || !agenda) return;
-    
+    if (!editingTaskDescription.trim() || !agenda) return;
+
+    const taskString = serializeTask({
+      start: editingTaskStart,
+      end: editingTaskEnd,
+      description: editingTaskDescription.trim()
+    });
+
     const dayAgenda = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
     const currentTasks = dayAgenda?.tasks || [];
     const newTasks = [...currentTasks];
-    newTasks[taskIndex] = editingTaskValue.trim();
+    newTasks[taskIndex] = taskString;
     await updateDayTasks(dayOfWeek, newTasks);
+
     setEditingTaskIndex(null);
-    setEditingTaskValue('');
+    setEditingTaskDescription('');
+    setEditingTaskStart('');
+    setEditingTaskEnd('');
   };
 
   const startEditingTask = (taskIndex: number, currentValue: string) => {
+    const parsed = parseTask(currentValue, taskIndex);
     setEditingTaskIndex(taskIndex);
-    setEditingTaskValue(currentValue);
+    setEditingTaskDescription(parsed.description);
+    setEditingTaskStart(parsed.start);
+    setEditingTaskEnd(parsed.end);
   };
 
   if (loading) {
@@ -85,7 +183,7 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
       <div className="absolute right-4 top-4 opacity-10">
         <Calendar className="h-24 w-24 text-primary" />
       </div>
-      
+
       <CardHeader className="pb-2">
         <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
           <Calendar className="h-5 w-5 text-primary" />
@@ -100,7 +198,7 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
           Semana de {format(weekStart, "dd 'de' MMMM", { locale: ptBR })}
         </p>
       </CardHeader>
-      
+
       <CardContent className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4">
           {agenda?.days.map((day) => {
@@ -108,13 +206,23 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
             const isToday = day.dayOfWeek === today;
             const isEditing = editingDay === day.dayOfWeek;
 
+            // Parse and sort tasks
+            const timeBlocks = day.tasks
+              .map((t, i) => parseTask(t, i, day.completedIndices))
+              .sort((a, b) => {
+                if (a.start && b.start) return a.start.localeCompare(b.start);
+                if (a.start) return -1;
+                if (b.start) return 1;
+                return 0; // Keep original order if no time
+              });
+
             return (
               <div
                 key={day.dayOfWeek}
                 className={`
-                  p-4 rounded-lg backdrop-blur-sm border transition-all min-w-0
-                  ${isToday 
-                    ? 'bg-primary/20 border-primary/50 ring-2 ring-primary/30' 
+                  p-4 rounded-lg backdrop-blur-sm border transition-all min-w-0 flex flex-col
+                  ${isToday
+                    ? 'bg-primary/20 border-primary/50 ring-2 ring-primary/30'
                     : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }
                 `}
@@ -132,66 +240,110 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-slate-300 hover:text-white hover:bg-white/10"
-                    onClick={() => setEditingDay(isEditing ? null : day.dayOfWeek)}
+                    onClick={() => {
+                      if (!isEditing) {
+                        const nextSlot = getNextTimeSlot(day.tasks);
+                        setNewTaskStart(nextSlot.start);
+                        setNewTaskEnd(nextSlot.end);
+                        setEditingDay(day.dayOfWeek);
+                      } else {
+                        setEditingDay(null);
+                      }
+                    }}
                   >
                     {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
                   </Button>
                 </div>
 
-                <div className="space-y-2 min-h-[80px]">
+                <div className="space-y-2 flex-1">
                   {day.tasks.length === 0 && !isEditing && (
                     <p className="text-sm text-slate-400 italic">Nenhuma tarefa</p>
                   )}
-                  
-                  {day.tasks.map((task, taskIndex) => {
-                    const isCompleted = day.completedIndices?.includes(taskIndex);
-                    
+
+                  {timeBlocks.map((block) => {
+                    const isTaskEditing = editingTaskIndex === block.originalIndex && isEditing;
+
                     return (
                       <div
-                        key={taskIndex}
-                        className="flex items-start gap-2 group"
+                        key={block.originalIndex}
+                        className="group relative"
                       >
-                        {editingTaskIndex === taskIndex && isEditing ? (
-                          <div className="flex items-center gap-2 flex-1">
+                        {isTaskEditing ? (
+                          <div className="flex flex-col gap-2 p-2 bg-black/20 rounded border border-white/10">
+                            <div className="flex gap-2">
+                              <Input
+                                type="time"
+                                value={editingTaskStart}
+                                onChange={(e) => setEditingTaskStart(e.target.value)}
+                                className="h-7 text-xs bg-white/10 border-white/20 text-white w-20 px-1"
+                              />
+                              <span className="text-white self-center">-</span>
+                              <Input
+                                type="time"
+                                value={editingTaskEnd}
+                                onChange={(e) => setEditingTaskEnd(e.target.value)}
+                                className="h-7 text-xs bg-white/10 border-white/20 text-white w-20 px-1"
+                              />
+                            </div>
                             <Input
-                              value={editingTaskValue}
-                              onChange={(e) => setEditingTaskValue(e.target.value)}
+                              value={editingTaskDescription}
+                              onChange={(e) => setEditingTaskDescription(e.target.value)}
                               className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleEditTask(day.dayOfWeek, taskIndex);
+                                if (e.key === 'Enter') handleEditTask(day.dayOfWeek, block.originalIndex);
                                 if (e.key === 'Escape') setEditingTaskIndex(null);
                               }}
                             />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-green-400 hover:text-green-300 hover:bg-green-400/10"
-                              onClick={() => handleEditTask(day.dayOfWeek, taskIndex)}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs hover:bg-white/10"
+                                onClick={() => setEditingTaskIndex(null)}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
+                                onClick={() => handleEditTask(day.dayOfWeek, block.originalIndex)}
+                              >
+                                Salvar
+                              </Button>
+                            </div>
                           </div>
                         ) : (
-                          <>
+                          <div className={`
+                            flex items-start gap-2 p-2 rounded transition-colors
+                            ${block.isCompleted ? 'bg-green-500/10' : 'hover:bg-white/5'}
+                          `}>
                             {!isAdminView && (
                               <Checkbox
-                                checked={isCompleted}
-                                onCheckedChange={() => toggleTaskCompletion(day.dayOfWeek, taskIndex)}
-                                className="mt-0.5 border-slate-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                checked={block.isCompleted}
+                                onCheckedChange={() => toggleTaskCompletion(day.dayOfWeek, block.originalIndex)}
+                                className="mt-1 border-slate-400 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                               />
                             )}
-                            <span className={`text-sm leading-relaxed flex-1 break-words whitespace-normal ${
-                              isCompleted ? 'text-slate-400 line-through' : 'text-white'
-                            }`}>
-                              {isAdminView && '• '}{task}
-                            </span>
+
+                            <div className="flex-1 min-w-0">
+                              {block.start && (
+                                <div className="text-xs font-mono text-primary/80 mb-0.5 font-bold">
+                                  {block.start} - {block.end}
+                                </div>
+                              )}
+                              <p className={`text-sm leading-snug break-words whitespace-normal ${block.isCompleted ? 'text-slate-400 line-through' : 'text-white'
+                                }`}>
+                                {block.description}
+                              </p>
+                            </div>
+
                             {isEditing && (
-                              <div className="flex gap-1 shrink-0">
+                              <div className="flex flex-col gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 text-slate-300 hover:text-white hover:bg-white/10"
-                                  onClick={() => startEditingTask(taskIndex, task)}
+                                  onClick={() => startEditingTask(block.originalIndex, day.tasks[block.originalIndex])}
                                 >
                                   <Edit2 className="h-3 w-3" />
                                 </Button>
@@ -199,37 +351,56 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 text-slate-300 hover:text-red-400 hover:bg-red-400/10"
-                                  onClick={() => handleRemoveTask(day.dayOfWeek, taskIndex)}
+                                  onClick={() => handleRemoveTask(day.dayOfWeek, block.originalIndex)}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
                             )}
-                          </>
+                          </div>
                         )}
                       </div>
                     );
                   })}
 
                   {isEditing && (
-                    <div className="flex items-center gap-2 mt-3">
-                      <Input
-                        value={newTask}
-                        onChange={(e) => setNewTask(e.target.value)}
-                        placeholder="Nova tarefa..."
-                        className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleAddTask(day.dayOfWeek);
-                        }}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/10"
-                        onClick={() => handleAddTask(day.dayOfWeek)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            type="time"
+                            value={newTaskStart}
+                            onChange={(e) => setNewTaskStart(e.target.value)}
+                            className="h-8 text-xs bg-white/10 border-white/20 text-white w-24"
+                          />
+                          <span className="text-slate-400">-</span>
+                          <Input
+                            type="time"
+                            value={newTaskEnd}
+                            onChange={(e) => setNewTaskEnd(e.target.value)}
+                            className="h-8 text-xs bg-white/10 border-white/20 text-white w-24"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newTaskDescription}
+                            onChange={(e) => setNewTaskDescription(e.target.value)}
+                            placeholder="Nova tarefa..."
+                            className="h-8 text-sm bg-white/10 border-white/20 text-white placeholder:text-slate-400"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddTask(day.dayOfWeek);
+                            }}
+                          />
+                          <Button
+                            variant="default" // Changed to default for better visibility
+                            size="icon"
+                            className="h-8 w-8 bg-primary hover:bg-primary/80 text-black shrink-0"
+                            onClick={() => handleAddTask(day.dayOfWeek)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

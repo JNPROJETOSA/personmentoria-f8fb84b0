@@ -12,7 +12,9 @@ import { Heart, Smile, Battery, Moon, AlertTriangle, BookOpen, FileDown, Trendin
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import { saveAs } from 'file-saver';
 import autoTable from 'jspdf-autotable';
+import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 
 interface XoBurnoutProps {
   data: BurnoutData;
@@ -23,7 +25,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportDays, setReportDays] = useState('7');
-  
+
   // Check-in form state
   const [feeling, setFeeling] = useState(3);
   const [energy, setEnergy] = useState(3);
@@ -42,20 +44,20 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
     performance: string
   ): BurnoutLevel => {
     let score = 0;
-    
+
     // Positive indicators
     score += feeling + energy + mood; // Max 15
     if (sleep === 'great') score += 3;
     if (sleep === 'ok') score += 1;
     if (performance === 'yes') score += 3;
     if (performance === 'partially') score += 1;
-    
+
     // Negative indicators
     if (stress) score -= 3;
-    
+
     // Total possible: 24 (15 + 3 + 3 + 3)
     // With stress: can go to 21
-    
+
     if (score >= 18) return 'green';
     if (score >= 12) return 'yellow';
     return 'red';
@@ -63,7 +65,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
 
   const handleSubmitCheckIn = async () => {
     const level = calculateLevel(feeling, energy, mood, sleep, stress, studyPerformance);
-    
+
     const now = new Date();
     const checkIn: Omit<CheckInEntry, 'id' | 'level'> = {
       date: now.toISOString().split('T')[0],
@@ -179,8 +181,8 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
 
   const generatePDF = () => {
     const doc = new jsPDF();
-    const filteredData = reportDays === 'all' 
-      ? burnoutData.checkIns 
+    const filteredData = reportDays === 'all'
+      ? burnoutData.checkIns
       : burnoutData.checkIns.slice(0, parseInt(reportDays));
 
     // Header
@@ -189,11 +191,11 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     doc.text('Mentoria Regisdência - Relatório de Bem-Estar', 105, 15, { align: 'center' });
-    
+
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
-    const periodText = reportDays === 'all' 
-      ? `Período: Desde o início (${filteredData.length} check-ins)` 
+    const periodText = reportDays === 'all'
+      ? `Período: Desde o início (${filteredData.length} check-ins)`
       : `Período: Últimos ${reportDays} dias`;
     doc.text(periodText, 20, 35);
     doc.text(`Data de geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, 40);
@@ -232,20 +234,20 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
 
     // Trends Analysis
     const finalY = (doc as any).lastAutoTable?.finalY || 75;
-    
+
     // Calculate averages
     const avgFeeling = (filteredData.reduce((sum, e) => sum + e.feeling, 0) / filteredData.length).toFixed(1);
     const avgEnergy = (filteredData.reduce((sum, e) => sum + e.energy, 0) / filteredData.length).toFixed(1);
     const avgMood = (filteredData.reduce((sum, e) => sum + e.mood, 0) / filteredData.length).toFixed(1);
-    
+
     doc.setFontSize(12);
     doc.text('Análise de Tendências', 20, finalY + 15);
-    
+
     doc.setFontSize(10);
     doc.text(`Média de Sentimento: ${avgFeeling}/5`, 25, finalY + 23);
     doc.text(`Média de Energia: ${avgEnergy}/5`, 25, finalY + 29);
     doc.text(`Média de Humor: ${avgMood}/5`, 25, finalY + 35);
-    
+
     // Visual trend bars
     const drawBar = (y: number, value: number, label: string, color: [number, number, number]) => {
       doc.setFillColor(color[0], color[1], color[2]);
@@ -254,23 +256,23 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
       doc.setDrawColor(200, 200, 200);
       doc.rect(25, y, 80, 4, 'S');
     };
-    
+
     drawBar(finalY + 43, parseFloat(avgFeeling), 'Sentimento', [59, 130, 246]); // Blue
     drawBar(finalY + 50, parseFloat(avgEnergy), 'Energia', [16, 185, 129]); // Green
     drawBar(finalY + 57, parseFloat(avgMood), 'Humor', [245, 158, 11]); // Orange
-    
+
     // Sleep quality
     const sleepStats = {
       great: filteredData.filter(e => e.sleep === 'great').length,
       ok: filteredData.filter(e => e.sleep === 'ok').length,
       bad: filteredData.filter(e => e.sleep === 'bad').length
     };
-    
+
     doc.setFontSize(10);
     doc.text('Qualidade do Sono:', 25, finalY + 67);
     doc.setFontSize(9);
     doc.text(`Ótimo: ${sleepStats.great} dias | Ok: ${sleepStats.ok} dias | Ruim: ${sleepStats.bad} dias`, 25, finalY + 73);
-    
+
     // Recommendations
     doc.setFontSize(12);
     doc.text('Sugestões Gerais de Autocuidado', 20, finalY + 85);
@@ -286,11 +288,14 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
       doc.text(sug, 25, finalY + 92 + (idx * 6));
     });
 
-    const fileName = reportDays === 'all' 
-      ? 'relatorio-bem-estar-completo.pdf' 
+    const fileName = reportDays === 'all'
+      ? 'relatorio-bem-estar-completo.pdf'
       : `relatorio-bem-estar-${reportDays}dias.pdf`;
-    doc.save(fileName);
-    
+
+    // Using FileSaver.js for cross-browser compatibility
+    const blob = doc.output('blob');
+    saveAs(blob, fileName);
+
     toast({
       title: "Relatório gerado",
       description: "Seu relatório de bem-estar foi baixado com sucesso."
@@ -309,7 +314,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
             Xô Burnout
           </CardTitle>
           <CardDescription>
-            Um espaço seguro e voluntário para cuidar do seu bem-estar durante a jornada rumo à residência. 
+            Um espaço seguro e voluntário para cuidar do seu bem-estar durante a jornada rumo à residência.
             Registre como você está se sentindo, sem pressão e sem cobrança.
           </CardDescription>
         </CardHeader>

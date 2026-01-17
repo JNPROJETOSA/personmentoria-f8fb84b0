@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, BookOpen, Plus, Zap, Trophy, Sparkles, Trash2, Edit2 } from 'lucide-react';
+import { ChevronDown, BookOpen, Plus, Eye, Trash2, Edit2, CheckCircle, Circle, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MedicalArea, TopicStatus, EditorialData, EditorialArea, EditorialSubarea, EditorialTopic } from '@/lib/types';
-import { AREA_COLORS, EDITORIAL_TEMPLATE } from '@/lib/constants';
+import { TopicStatus, EditorialData, EditorialSubarea, EditorialTopic } from '@/lib/types';
+import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
 import { EditorialItem } from '@/hooks/useEditorial';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { savePdf } from '@/lib/pdf-helpers';
+import { saveAs } from 'file-saver';
 
 interface EditorialProps {
   data: EditorialData;
@@ -27,50 +30,48 @@ interface EditorialProps {
   createEditorial: (name: string) => Promise<string | null>;
   deleteEditorial: (id: string) => Promise<void>;
   renameEditorial: (id: string, name: string) => Promise<void>;
+  deleteSubarea?: (areaId: string, subareaId: string) => Promise<void>;
+  renameSubarea?: (areaId: string, subareaId: string, newName: string) => Promise<void>;
+  deleteTopic?: (areaId: string, subareaId: string, topicId: string) => Promise<void>;
+  renameTopic?: (areaId: string, subareaId: string, topicId: string, newName: string) => Promise<void>;
 }
 
 const STATUS_CONFIG = {
   [TopicStatus.NOT_STARTED]: {
-    label: 'Não Iniciado',
-    color: 'bg-slate-300 dark:bg-slate-600',
-    textColor: 'text-slate-700 dark:text-slate-300',
-    badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+    label: 'Não Visto',
+    color: 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800',
+    textColor: 'text-slate-500',
+    badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
   },
   [TopicStatus.THEORY_SEEN]: {
-    label: 'Teoria Vista',
-    color: 'bg-blue-400 dark:bg-blue-600',
-    textColor: 'text-blue-700 dark:text-blue-300',
-    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-  },
-  [TopicStatus.MATERIALS_DONE]: {
-    label: 'Materiais Feitos',
-    color: 'bg-amber-400 dark:bg-amber-600',
-    textColor: 'text-amber-700 dark:text-amber-300',
-    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
-  },
-  [TopicStatus.MASTERED]: {
-    label: 'Dominado',
-    color: 'bg-emerald-500 dark:bg-emerald-600',
-    textColor: 'text-emerald-700 dark:text-emerald-300',
+    label: 'Visto',
+    color: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800',
+    textColor: 'text-emerald-700 dark:text-emerald-400',
     badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
   }
 };
 
-export default function Editorial({ 
-  data: editorialData, 
-  setData: setEditorialData, 
-  updateTopicStatus, 
-  onAddXP, 
+export default function Editorial({
+  data: editorialData,
+  setData: setEditorialData,
+  updateTopicStatus,
+  onAddXP,
   onTabChange,
   editorials,
   selectedEditorialId,
   setSelectedEditorialId,
   createEditorial,
   deleteEditorial,
-  renameEditorial
+  renameEditorial,
+  deleteSubarea,
+  renameSubarea,
+  deleteTopic,
+  renameTopic
 }: EditorialProps) {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [expandedSubareas, setExpandedSubareas] = useState<Set<string>>(new Set());
+
+  // Dialog states
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
   const [isAddSubareaDialogOpen, setIsAddSubareaDialogOpen] = useState(false);
   const [selectedAreaForTopic, setSelectedAreaForTopic] = useState<string>('');
@@ -78,13 +79,22 @@ export default function Editorial({
   const [selectedSubareaForTopic, setSelectedSubareaForTopic] = useState<string>('');
   const [newTopicName, setNewTopicName] = useState('');
   const [newSubareaName, setNewSubareaName] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState<{ areaId: string; subareaId: string; topicId: string } | null>(null);
-  
-  // New editorial management state
+
+  // Editorial management states
   const [isCreateEditorialDialogOpen, setIsCreateEditorialDialogOpen] = useState(false);
   const [newEditorialName, setNewEditorialName] = useState('');
   const [editingEditorialId, setEditingEditorialId] = useState<string | null>(null);
   const [editingEditorialName, setEditingEditorialName] = useState('');
+
+  // Editing Item (Subarea/Topic) states
+  const [itemToRename, setItemToRename] = useState<{
+    type: 'subarea' | 'topic',
+    areaId: string,
+    subareaId: string,
+    topicId?: string,
+    currentName: string
+  } | null>(null);
+  const [newNameInput, setNewNameInput] = useState('');
 
   const calculateProgress = () => {
     let total = 0;
@@ -94,7 +104,7 @@ export default function Editorial({
       area.subareas.forEach(subarea => {
         subarea.topics.forEach(topic => {
           total++;
-          if (topic.status === TopicStatus.MASTERED) {
+          if (topic.status !== TopicStatus.NOT_STARTED) {
             completed++;
           }
         });
@@ -104,18 +114,25 @@ export default function Editorial({
     return total > 0 ? (completed / total) * 100 : 0;
   };
 
-  const calculateAreaProgress = (area: EditorialArea) => {
+  const calculateAreaProgress = (options: { areaId?: string, subareaId?: string }) => {
     let total = 0;
     let completed = 0;
 
-    area.subareas.forEach(subarea => {
-      subarea.topics.forEach(topic => {
-        total++;
-        if (topic.status === TopicStatus.MASTERED) {
-          completed++;
-        }
+    const countTopic = (topic: EditorialTopic) => {
+      total++;
+      if (topic.status !== TopicStatus.NOT_STARTED) completed++;
+    };
+
+    if (options.areaId) {
+      const area = editorialData.areas.find(a => a.id === options.areaId);
+      area?.subareas.forEach(subarea => subarea.topics.forEach(countTopic));
+    } else if (options.subareaId) {
+      // Find subarea across all areas (assuming unique IDs ideally, or pass areaId too)
+      editorialData.areas.forEach(a => {
+        const sub = a.subareas.find(s => s.id === options.subareaId);
+        if (sub) sub.topics.forEach(countTopic);
       });
-    });
+    }
 
     return total > 0 ? (completed / total) * 100 : 0;
   };
@@ -140,188 +157,197 @@ export default function Editorial({
     setExpandedSubareas(newExpanded);
   };
 
-  const handleTopicStatusChange = async (areaId: string, subareaId: string, topicId: string, newStatus: TopicStatus) => {
-    const updatedData = { ...editorialData };
-    const area = updatedData.areas.find(a => a.id === areaId);
-    if (!area) return;
+  const handleToggleSeen = async (areaId: string, subareaId: string, topicId: string, currentStatus: TopicStatus, topicName: string) => {
+    // Logic: Toggle between NOT_STARTED and THEORY_SEEN (Mark/Unmark as Seen)
+    // If it's anything else (MASTERED, etc), logic can default to toggle off or just set to SEEN if needed.
+    // Simplifying to: If NOT_STARTED -> THEORY_SEEN. Else -> NOT_STARTED.
 
-    const subarea = area.subareas.find(s => s.id === subareaId);
-    if (!subarea) return;
+    const newStatus = currentStatus === TopicStatus.NOT_STARTED
+      ? TopicStatus.THEORY_SEEN
+      : TopicStatus.NOT_STARTED;
 
-    const topic = subarea.topics.find(t => t.id === topicId);
-    if (!topic) return;
+    // Optimistic update handled by hook if connected, but let's notify user
+    const area = editorialData.areas.find(a => a.id === areaId);
+    const subarea = area?.subareas.find(s => s.id === subareaId);
 
-    const oldStatus = topic.status;
-    topic.status = newStatus;
+    if (area && subarea) {
+      await updateTopicStatus(area.name, subarea.name, topicName, newStatus);
 
-    setEditorialData(updatedData);
-    
-    // Save to cloud
-    await updateTopicStatus(area.name, subarea.name, topic.name, newStatus);
+      if (newStatus === TopicStatus.THEORY_SEEN) {
+        toast({
+          title: "Marcado como visto",
+          description: `Você completou o estudo de ${topicName}`,
+        });
 
-    // Check if area is now 100% complete for gamification
-    const areaProgress = calculateAreaProgress(area);
-    if (areaProgress === 100 && oldStatus !== TopicStatus.MASTERED && newStatus === TopicStatus.MASTERED) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-      onAddXP(50);
-      toast({
-        title: "🏆 Área Dominada!",
-        description: `Parabéns! Você completou 100% de ${area.name}! +50 XP`,
-      });
-    } else if (newStatus === TopicStatus.MASTERED && oldStatus !== TopicStatus.MASTERED) {
-      onAddXP(5);
+        // 100% check
+        const areaProgress = calculateAreaProgress({ areaId });
+        // Since state updates might lag slightly, this check is approximation or needs real-time calc
+        if (areaProgress >= 99) { // nearly 100
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        }
+      }
     }
-
-    toast({
-      title: "Status Atualizado",
-      description: `${topic.name}: ${STATUS_CONFIG[newStatus].label}`,
-    });
-
-    setSelectedTopic(null);
   };
 
   const addCustomTopic = () => {
-    if (!newTopicName.trim() || !selectedAreaForTopic || !selectedSubareaForTopic) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha todos os campos para adicionar o tópico.",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!newTopicName.trim() || !selectedAreaForTopic || !selectedSubareaForTopic) return;
 
     const updatedData = { ...editorialData };
     const area = updatedData.areas.find(a => a.id === selectedAreaForTopic);
-    if (!area) return;
+    const subarea = area?.subareas.find(s => s.id === selectedSubareaForTopic);
 
-    const subarea = area.subareas.find(s => s.id === selectedSubareaForTopic);
-    if (!subarea) return;
+    if (area && subarea) {
+      const newTopic: EditorialTopic = {
+        id: `custom-${Date.now()}`,
+        name: newTopicName.trim(),
+        status: TopicStatus.NOT_STARTED
+      };
+      subarea.topics.push(newTopic);
+      setEditorialData(updatedData);
 
-    const newTopic: EditorialTopic = {
-      id: `custom-${Date.now()}`,
-      name: newTopicName.trim(),
-      status: TopicStatus.NOT_STARTED
-    };
-
-    subarea.topics.push(newTopic);
-    setEditorialData(updatedData);
-
-    toast({
-      title: "Tópico Adicionado!",
-      description: `${newTopicName} foi adicionado com sucesso.`,
-    });
-
-    setNewTopicName('');
-    setIsAddTopicDialogOpen(false);
+      toast({ title: "Tópico Adicionado", description: newTopicName });
+      setNewTopicName('');
+      setIsAddTopicDialogOpen(false);
+    }
   };
 
   const addCustomSubarea = () => {
-    if (!newSubareaName.trim() || !selectedAreaForSubarea) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Preencha todos os campos para adicionar a subárea.",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!newSubareaName.trim() || !selectedAreaForSubarea) return;
 
     const updatedData = { ...editorialData };
     const area = updatedData.areas.find(a => a.id === selectedAreaForSubarea);
-    if (!area) return;
 
-    const newSubarea: EditorialSubarea = {
-      id: `custom-subarea-${Date.now()}`,
-      name: newSubareaName.trim(),
-      topics: []
-    };
+    if (area) {
+      const newSubarea: EditorialSubarea = {
+        id: `custom-subarea-${Date.now()}`,
+        name: newSubareaName.trim(),
+        topics: []
+      };
+      area.subareas.push(newSubarea);
+      setEditorialData(updatedData);
 
-    area.subareas.push(newSubarea);
-    setEditorialData(updatedData);
-
-    toast({
-      title: "Subárea Adicionada!",
-      description: `${newSubareaName} foi adicionada com sucesso em ${area.name}.`,
-    });
-
-    setNewSubareaName('');
-    setSelectedAreaForSubarea('');
-    setIsAddSubareaDialogOpen(false);
-  };
-
-  const handleQuickAction = (topicName: string, action: 'exercises' | 'flashcard' | 'class') => {
-    if (action === 'exercises') {
-      onTabChange('exercises');
-      toast({
-        title: "Indo para Exercícios",
-        description: `Filtro aplicado: ${topicName}`,
-      });
-    } else if (action === 'flashcard') {
-      onTabChange('flashcards');
-      toast({
-        title: "Indo para Flashcards",
-        description: `Crie um flashcard sobre ${topicName}`,
-      });
-    } else if (action === 'class') {
-      onTabChange('classes');
-      toast({
-        title: "Indo para Aulas",
-        description: `Registre a aula sobre ${topicName}`,
-      });
+      toast({ title: "Subárea Adicionada", description: newSubareaName });
+      setNewSubareaName('');
+      setSelectedAreaForSubarea('');
+      setIsAddSubareaDialogOpen(false);
     }
   };
 
   const handleCreateEditorial = async () => {
-    if (!newEditorialName.trim()) {
-      toast({
-        title: "Nome obrigatório",
-        description: "Digite um nome para o edital.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    if (!newEditorialName.trim()) return;
     const id = await createEditorial(newEditorialName.trim());
     if (id) {
-      toast({
-        title: "Edital Criado!",
-        description: `${newEditorialName} foi criado com sucesso.`,
-      });
+      toast({ title: "Edital Criado", description: newEditorialName });
       setNewEditorialName('');
       setIsCreateEditorialDialogOpen(false);
     }
   };
 
   const handleDeleteEditorial = async (id: string) => {
-    if (editorials.length <= 1) {
-      toast({
-        title: "Não é possível excluir",
-        description: "Você precisa ter pelo menos um edital.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    if (editorials.length <= 1) return;
     await deleteEditorial(id);
-    toast({
-      title: "Edital Excluído",
-      description: "O edital foi removido com sucesso.",
-    });
+    toast({ title: "Edital Excluído" });
   };
 
-  const handleRenameEditorial = async () => {
-    if (!editingEditorialId || !editingEditorialName.trim()) return;
+  const handleSaveRename = async () => {
+    if (!itemToRename || !newNameInput.trim()) return;
 
-    await renameEditorial(editingEditorialId, editingEditorialName.trim());
-    toast({
-      title: "Edital Renomeado",
-      description: "O nome do edital foi atualizado.",
+    try {
+      if (itemToRename.type === 'subarea' && renameSubarea) {
+        await renameSubarea(itemToRename.areaId, itemToRename.subareaId, newNameInput.trim());
+      } else if (itemToRename.type === 'topic' && renameTopic && itemToRename.topicId) {
+        await renameTopic(itemToRename.areaId, itemToRename.subareaId, itemToRename.topicId, newNameInput.trim());
+      }
+      toast({ title: "Item renomeado com sucesso" });
+      setItemToRename(null);
+      setNewNameInput('');
+    } catch (error) {
+      toast({ title: "Erro ao renomear", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteItem = async (type: 'subarea' | 'topic', areaId: string, subareaId: string, topicId?: string) => {
+    try {
+      if (type === 'subarea' && deleteSubarea) {
+        await deleteSubarea(areaId, subareaId);
+      } else if (type === 'topic' && deleteTopic && topicId) {
+        await deleteTopic(areaId, subareaId, topicId);
+      }
+      toast({ title: "Item excluído", description: "O item foi removido do edital." });
+    } catch (error) {
+      toast({ title: "Erro ao excluir", variant: "destructive" });
+    }
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const currentEditorialName = editorials.find(e => e.id === selectedEditorialId)?.name || 'Edital';
+
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(33, 33, 33);
+    doc.text(currentEditorialName, 14, 20);
+
+    doc.setFontSize(14);
+    doc.setTextColor(66, 66, 66);
+    doc.text(`Relatório de Progresso Acadêmico`, 14, 30);
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 36);
+
+    // Progress
+    const progress = calculateProgress();
+    doc.setFontSize(12);
+    doc.setTextColor(33, 33, 33);
+    doc.text(`Progresso Geral do Edital: ${progress.toFixed(1)}%`, 14, 46);
+
+    // Table Data
+    const tableData: any[] = [];
+
+    editorialData.areas.forEach(area => {
+      // Add Area Header Row
+      const areaProgress = calculateAreaProgress({ areaId: area.id });
+      tableData.push([{ content: `${area.name.toUpperCase()} - ${areaProgress.toFixed(0)}% Concluído`, colSpan: 2, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [0, 0, 0] } }]);
+
+      area.subareas.forEach(subarea => {
+        subarea.topics.forEach(topic => {
+          const status = topic.status === TopicStatus.THEORY_SEEN ? 'VISTO' : 'NÃO VISTO';
+          tableData.push([
+            `${subarea.name}: ${topic.name}`,
+            status
+          ]);
+        });
+      });
     });
-    setEditingEditorialId(null);
-    setEditingEditorialName('');
+
+    autoTable(doc, {
+      startY: 55,
+      head: [['Tópico', 'Status']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [22, 163, 74], textColor: 255 }, // Emerald-600 color
+      columnStyles: {
+        0: { cellWidth: 120 },
+        1: { cellWidth: 40, halign: 'center' }
+      },
+      didParseCell: function (data) {
+        if (data.section === 'body' && data.column.index === 1) {
+          if (data.cell.text[0] === 'VISTO') {
+            data.cell.styles.textColor = [22, 163, 74]; // Green
+            data.cell.styles.fontStyle = 'bold';
+          } else {
+            data.cell.styles.textColor = [156, 163, 175]; // Gray
+          }
+        }
+      }
+    });
+
+    // Using FileSaver.js for cross-browser compatibility
+    const filename = `progresso_edital_${new Date().toISOString().split('T')[0]}.pdf`;
+    const blob = doc.output('blob');
+    saveAs(blob, filename);
+
+    toast({ title: "PDF Exportado", description: "O relatório de progresso foi baixado." });
   };
 
   const globalProgress = calculateProgress();
@@ -329,171 +355,195 @@ export default function Editorial({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Editorial Selector */}
-      <Card className="border-primary/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <BookOpen className="w-5 h-5" />
-            Selecionar Edital
-          </CardTitle>
-          <CardDescription>
-            Gerencie múltiplos editais para diferentes bancas ou cursos
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Select value={selectedEditorialId || ''} onValueChange={setSelectedEditorialId}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Selecione um edital" />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                {editorials.map(ed => (
-                  <SelectItem key={ed.id} value={ed.id}>{ed.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={() => {
-                if (selectedEditorialId) {
-                  const current = editorials.find(e => e.id === selectedEditorialId);
-                  setEditingEditorialId(selectedEditorialId);
-                  setEditingEditorialName(current?.name || '');
-                }
-              }}
-              title="Renomear edital"
-            >
-              <Edit2 className="w-4 h-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={() => selectedEditorialId && handleDeleteEditorial(selectedEditorialId)}
-              title="Excluir edital"
-              disabled={editorials.length <= 1}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => setIsCreateEditorialDialogOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Criar Novo Edital
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Header & Controls */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <BookOpen className="w-5 h-5" />
+              Selecionar Edital
+            </CardTitle>
+            <CardDescription>
+              Gerencie múltiplos editais
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Select value={selectedEditorialId || ''} onValueChange={setSelectedEditorialId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecione um edital" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {editorials.map(ed => (
+                    <SelectItem key={ed.id} value={ed.id}>{ed.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" onClick={() => setIsCreateEditorialDialogOpen(true)} title="Novo Edital">
+                <Plus className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => selectedEditorialId && handleDeleteEditorial(selectedEditorialId)} disabled={editorials.length <= 1} title="Excluir Edital">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleExportPDF} title="Exportar PDF do Progresso">
+                <Download className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Global Progress */}
-      <Card className="border-perry-teal dark:border-perry-teal/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-perry-teal">
-            <BookOpen className="w-6 h-6" />
-            Progresso: {currentEditorialName}
-          </CardTitle>
-          <CardDescription>
-            Você dominou {globalProgress.toFixed(1)}% de todo o conteúdo
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Progress value={globalProgress} className="h-4" />
-            <p className="text-sm text-muted-foreground text-right">
-              {globalProgress.toFixed(1)}% completo
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        <Card className="border-emerald-500/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle className="w-6 h-6" />
+              Progresso Geral
+            </CardTitle>
+            <CardDescription>
+              {currentEditorialName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm font-medium">
+                <span>Conclusão</span>
+                <span>{globalProgress.toFixed(1)}%</span>
+              </div>
+              <Progress value={globalProgress} className="h-3 bg-slate-100 dark:bg-slate-800" indicatorClassName="bg-emerald-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Areas */}
+      {/* Areas List */}
       <div className="space-y-4">
         {editorialData.areas.map(area => {
-          const areaProgress = calculateAreaProgress(area);
+          const areaProgress = calculateAreaProgress({ areaId: area.id });
           const isExpanded = expandedAreas.has(area.id);
 
           return (
-            <Card key={area.id} className="overflow-hidden">
+            <Card key={area.id} className="overflow-hidden border-l-4" style={{ borderLeftColor: AREA_COLORS[area.name] || '#888' }}>
               <div
-                className="cursor-pointer hover:bg-accent/50 transition-colors"
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => toggleArea(area.id)}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: AREA_COLORS[area.name] }}
-                      />
                       <div className="flex-1">
-                        <CardTitle className="text-lg">{area.name}</CardTitle>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Progress value={areaProgress} className="h-2 flex-1" />
-                          <span className="text-sm font-medium text-muted-foreground min-w-[45px]">
-                            {areaProgress.toFixed(0)}%
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <CardTitle className="text-lg">{area.name}</CardTitle>
+                          <span className="text-sm font-bold text-muted-foreground">{areaProgress.toFixed(0)}%</span>
                         </div>
+                        <Progress value={areaProgress} className="h-1.5" />
                       </div>
                     </div>
-                    <ChevronDown
-                      className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    />
+                    <ChevronDown className={`w-5 h-5 ml-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </div>
                 </CardHeader>
               </div>
 
               {isExpanded && (
-                <CardContent className="pt-0">
-                  <div className="space-y-3 pl-7 border-l-2 ml-2" style={{ borderColor: AREA_COLORS[area.name] }}>
+                <CardContent className="pt-0 pb-4 bg-slate-50/50 dark:bg-slate-900/20">
+                  <div className="space-y-4 mt-4">
                     {area.subareas.map(subarea => {
                       const isSubareaExpanded = expandedSubareas.has(subarea.id);
-                      
+                      const subProgress = calculateAreaProgress({ subareaId: subarea.id });
+
                       return (
-                        <div key={subarea.id} className="space-y-2">
+                        <div key={subarea.id} className="bg-background border rounded-lg overflow-hidden shadow-sm">
                           <div
-                            className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/30 cursor-pointer transition-colors"
+                            className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => toggleSubarea(subarea.id)}
                           >
-                            <h4 className="font-semibold text-sm">{subarea.name}</h4>
-                            <ChevronDown
-                              className={`w-4 h-4 transition-transform ${isSubareaExpanded ? 'rotate-180' : ''}`}
-                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <h4 className="font-semibold text-sm">{subarea.name}</h4>
+                              <span className="text-xs text-muted-foreground">({subProgress.toFixed(0)}%)</span>
+                            </div>
+
+                            <div className="flex items-center gap-1 group">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-20 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setItemToRename({ type: 'subarea', areaId: area.id, subareaId: subarea.id, currentName: subarea.name });
+                                  setNewNameInput(subarea.name);
+                                }}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive opacity-20 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteItem('subarea', area.id, subarea.id);
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                              <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${isSubareaExpanded ? 'rotate-180' : ''}`} />
+                            </div>
                           </div>
 
                           {isSubareaExpanded && (
-                            <div className="space-y-2 pl-4">
-                              {subarea.topics.map(topic => (
-                                <div
-                                  key={topic.id}
-                                  className={`flex items-center justify-between p-3 rounded-lg border ${STATUS_CONFIG[topic.status].color} ${STATUS_CONFIG[topic.status].textColor} transition-all hover:shadow-md`}
-                                >
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <button
-                                      onClick={() => setSelectedTopic({ areaId: area.id, subareaId: subarea.id, topicId: topic.id })}
-                                      className="text-sm font-medium hover:underline text-left"
-                                    >
-                                      {topic.name}
-                                    </button>
-                                    <Badge variant="secondary" className={`text-xs ${STATUS_CONFIG[topic.status].badge}`}>
-                                      {STATUS_CONFIG[topic.status].label}
-                                    </Badge>
+                            <div className="p-3 pt-0 space-y-2 border-t bg-muted/30">
+                              {subarea.topics.map(topic => {
+                                const statusConfig = STATUS_CONFIG[topic.status === TopicStatus.NOT_STARTED ? TopicStatus.NOT_STARTED : TopicStatus.THEORY_SEEN];
+                                const isSeen = topic.status !== TopicStatus.NOT_STARTED;
+
+                                return (
+                                  <div
+                                    key={topic.id}
+                                    className={`flex items-center justify-between p-3 rounded-md bg-background border transition-all hover:shadow-sm group items-start ${isSeen ? 'border-emerald-200/50' : 'border-slate-100'}`}
+                                  >
+                                    <div className="flex-1 min-w-0 mr-3">
+                                      <span className={`text-sm font-medium block truncate ${isSeen ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                        {topic.name}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <Button
+                                        variant={isSeen ? "default" : "outline"}
+                                        size="sm"
+                                        className={`h-8 gap-2 transition-all ${isSeen ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-transparent' : 'text-muted-foreground hover:text-emerald-600 hover:border-emerald-200'}`}
+                                        onClick={() => handleToggleSeen(area.id, subarea.id, topic.id, topic.status, topic.name)}
+                                        title={isSeen ? "Marcar como não visto" : "Marcar como visto"}
+                                      >
+                                        {isSeen ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4 opacity-50" />}
+                                        <span className="text-xs hidden sm:inline">{isSeen ? 'Visto' : 'Marcar'}</span>
+                                      </Button>
+
+                                      <div className="flex items-center gap-0.5 border-l pl-2 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                          onClick={() => {
+                                            setItemToRename({ type: 'topic', areaId: area.id, subareaId: subarea.id, topicId: topic.id, currentName: topic.name });
+                                            setNewNameInput(topic.name);
+                                          }}
+                                          title="Editar tópico"
+                                        >
+                                          <Edit2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                          onClick={() => handleDeleteItem('topic', area.id, subarea.id, topic.id)}
+                                          title="Excluir tópico"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7"
-                                      onClick={() => handleQuickAction(topic.name, 'exercises')}
-                                      title="Treinar questões"
-                                    >
-                                      <Zap className="w-4 h-4 text-perry-accent" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           )}
                         </div>
@@ -507,213 +557,105 @@ export default function Editorial({
         })}
       </div>
 
-      {/* Add Custom Items */}
+      {/* Add Custom Items Buttons */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Plus className="w-4 h-4" />
-            Personalizar Edital
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Button onClick={() => setIsAddSubareaDialogOpen(true)} variant="outline" className="w-full">
+        <CardContent className="flex flex-col sm:flex-row gap-3 p-4">
+          <Button onClick={() => setIsAddSubareaDialogOpen(true)} variant="outline" className="flex-1">
             <Plus className="w-4 h-4 mr-2" />
-            Adicionar Subárea Personalizada
+            Adicionar Subárea
           </Button>
-          <Button onClick={() => setIsAddTopicDialogOpen(true)} variant="outline" className="w-full">
+          <Button onClick={() => setIsAddTopicDialogOpen(true)} variant="outline" className="flex-1">
             <Plus className="w-4 h-4 mr-2" />
-            Adicionar Tópico Personalizado
+            Adicionar Tópico
           </Button>
         </CardContent>
       </Card>
 
-      {/* Add Subarea Dialog */}
+      {/* Dialogs */}
       <Dialog open={isAddSubareaDialogOpen} onOpenChange={setIsAddSubareaDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adicionar Subárea Personalizada</DialogTitle>
-            <DialogDescription>
-              Crie uma nova subárea dentro de uma grande área médica
-            </DialogDescription>
+            <DialogTitle>Nova Subárea</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="area-select-subarea">Grande Área</Label>
+              <Label>Grande Área</Label>
               <Select value={selectedAreaForSubarea} onValueChange={setSelectedAreaForSubarea}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a área" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  {editorialData.areas.map(area => (
-                    <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
-                  ))}
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent className="z-50 bg-background">
+                  {editorialData.areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="subarea-name">Nome da Subárea</Label>
-              <Input
-                id="subarea-name"
-                placeholder="Ex: Reumatologia Pediátrica"
-                value={newSubareaName}
-                onChange={(e) => setNewSubareaName(e.target.value)}
-              />
+              <Label>Nome</Label>
+              <Input value={newSubareaName} onChange={e => setNewSubareaName(e.target.value)} placeholder="Ex: Doenças Raras" />
             </div>
-
-            <Button onClick={addCustomSubarea} className="w-full">
-              Adicionar Subárea
-            </Button>
+            <Button onClick={addCustomSubarea} className="w-full">Criar</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Add Topic Dialog */}
       <Dialog open={isAddTopicDialogOpen} onOpenChange={setIsAddTopicDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adicionar Tópico Personalizado</DialogTitle>
-            <DialogDescription>
-              Adicione um tópico específico da sua prova ou cursinho
-            </DialogDescription>
+            <DialogTitle>Novo Tópico</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="area-select">Grande Área</Label>
+              <Label>Área</Label>
               <Select value={selectedAreaForTopic} onValueChange={setSelectedAreaForTopic}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a área" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  {editorialData.areas.map(area => (
-                    <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
-                  ))}
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent className="z-50 bg-background">
+                  {editorialData.areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             {selectedAreaForTopic && (
               <div className="space-y-2">
-                <Label htmlFor="subarea-select">Subárea</Label>
+                <Label>Subárea</Label>
                 <Select value={selectedSubareaForTopic} onValueChange={setSelectedSubareaForTopic}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a subárea" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background z-50">
-                    {editorialData.areas
-                      .find(a => a.id === selectedAreaForTopic)
-                      ?.subareas.map(subarea => (
-                        <SelectItem key={subarea.id} value={subarea.id}>{subarea.name}</SelectItem>
-                      ))}
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent className="z-50 bg-background">
+                    {editorialData.areas.find(a => a.id === selectedAreaForTopic)?.subareas.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             )}
-
             <div className="space-y-2">
-              <Label htmlFor="topic-name">Nome do Tópico</Label>
-              <Input
-                id="topic-name"
-                placeholder="Ex: História da Medicina no Acre"
-                value={newTopicName}
-                onChange={(e) => setNewTopicName(e.target.value)}
-              />
+              <Label>Nome do Tópico</Label>
+              <Input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="Ex: Tratamento X" />
             </div>
-
-            <Button onClick={addCustomTopic} className="w-full">
-              Adicionar Tópico
-            </Button>
+            <Button onClick={addCustomTopic} className="w-full">Criar</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Status Change Dialog */}
-      {selectedTopic && (
-        <Dialog open={!!selectedTopic} onOpenChange={() => setSelectedTopic(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Atualizar Status</DialogTitle>
-              <DialogDescription>
-                Marque o progresso do seu estudo neste tópico
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 gap-3 py-4">
-              {Object.entries(STATUS_CONFIG).map(([status, config]) => (
-                <Button
-                  key={status}
-                  variant="outline"
-                  className={`justify-start h-auto p-4 ${config.badge}`}
-                  onClick={() => handleTopicStatusChange(
-                    selectedTopic.areaId,
-                    selectedTopic.subareaId,
-                    selectedTopic.topicId,
-                    status as TopicStatus
-                  )}
-                >
-                  <div className="text-left">
-                    <div className="font-semibold">{config.label}</div>
-                    <div className="text-xs opacity-70 mt-1">
-                      {status === TopicStatus.NOT_STARTED && 'Nunca vi na vida'}
-                      {status === TopicStatus.THEORY_SEEN && 'Já vi aula ou li apostila'}
-                      {status === TopicStatus.MATERIALS_DONE && 'Já fiz resumos ou flashcards'}
-                      {status === TopicStatus.MASTERED && 'Já treino questões e acerto bem'}
-                    </div>
-                  </div>
-                </Button>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Create Editorial Dialog */}
       <Dialog open={isCreateEditorialDialogOpen} onOpenChange={setIsCreateEditorialDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Criar Novo Edital</DialogTitle>
-            <DialogDescription>
-              Crie um edital para uma banca específica, curso ou programa
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+          <DialogHeader><DialogTitle>Criar Edital</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="editorial-name">Nome do Edital</Label>
-              <Input
-                id="editorial-name"
-                placeholder="Ex: SES-PE 2024, MEDCURSO, ENADE..."
-                value={newEditorialName}
-                onChange={(e) => setNewEditorialName(e.target.value)}
-              />
+              <Label>Nome</Label>
+              <Input value={newEditorialName} onChange={e => setNewEditorialName(e.target.value)} placeholder="Nome do edital" />
             </div>
-            <Button onClick={handleCreateEditorial} className="w-full">
-              Criar Edital
-            </Button>
+            <Button onClick={handleCreateEditorial} className="w-full">Criar</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Rename Editorial Dialog */}
-      <Dialog open={!!editingEditorialId} onOpenChange={(open) => !open && setEditingEditorialId(null)}>
+      {/* Rename Item Dialog */}
+      <Dialog open={!!itemToRename} onOpenChange={(open) => !open && setItemToRename(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Renomear Edital</DialogTitle>
-            <DialogDescription>
-              Altere o nome do edital selecionado
-            </DialogDescription>
+            <DialogTitle>Renomear {itemToRename?.type === 'subarea' ? 'Subárea' : 'Tópico'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="edit-editorial-name">Novo Nome</Label>
-              <Input
-                id="edit-editorial-name"
-                placeholder="Nome do edital"
-                value={editingEditorialName}
-                onChange={(e) => setEditingEditorialName(e.target.value)}
-              />
+              <Label>Novo Nome</Label>
+              <Input value={newNameInput} onChange={e => setNewNameInput(e.target.value)} />
             </div>
-            <Button onClick={handleRenameEditorial} className="w-full">
-              Salvar
-            </Button>
+            <Button onClick={handleSaveRename} className="w-full">Salvar Alterações</Button>
           </div>
         </DialogContent>
       </Dialog>

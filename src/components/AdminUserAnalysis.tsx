@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, BookOpen, PenTool, FileText, Trophy, Target, TrendingUp, 
-  TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon, CalendarDays, Save, Settings
+import {
+  ArrowLeft, BookOpen, PenTool, FileText, Trophy, Target, TrendingUp,
+  TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon, CalendarDays, Save, Settings,
+  ChevronDown, ChevronRight, History
 } from 'lucide-react';
 import { WeeklyAgenda } from '@/components/WeeklyAgenda';
 import { UserSummary } from '@/hooks/useAdminData';
@@ -22,7 +23,9 @@ import { getPerformanceColor } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { saveAs } from 'file-saver';
 
 interface AdminUserAnalysisProps {
   user: UserSummary;
@@ -39,6 +42,74 @@ interface UserFullData {
   burnoutCheckins: any[];
 }
 
+const TopicRow = ({ topic, index }: { topic: any, index: number }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <TableRow
+        className="cursor-pointer hover:bg-accent/50 transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <TableCell className="w-10">
+          {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        </TableCell>
+        <TableCell className="text-muted-foreground w-12 text-center">{index + 1}</TableCell>
+        <TableCell className="font-medium">{topic.topic}</TableCell>
+        <TableCell className="text-muted-foreground">{topic.area}</TableCell>
+        <TableCell className="text-center">{topic.total}</TableCell>
+        <TableCell className="text-center text-green-600">{topic.correct}</TableCell>
+        <TableCell className="text-center text-red-500">{topic.errors}</TableCell>
+        <TableCell className="text-center">
+          <Badge variant={topic.accuracy >= 70 ? 'default' : topic.accuracy >= 50 ? 'secondary' : 'destructive'}>
+            {topic.accuracy}%
+          </Badge>
+        </TableCell>
+      </TableRow>
+      {isOpen && (
+        <TableRow className="bg-muted/30 hover:bg-muted/30">
+          <TableCell colSpan={8} className="p-4">
+            <div className="rounded-lg border bg-card text-card-foreground shadow-sm animate-in slide-in-from-top-2 duration-200">
+              <div className="p-4 border-b flex items-center gap-2">
+                <History className="w-4 h-4 text-primary" />
+                <h4 className="font-semibold text-sm">Histórico de Evolução - {topic.topic}</h4>
+              </div>
+              <div className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b-0 bg-muted/50">
+                      <TableHead>Data</TableHead>
+                      <TableHead className="text-center">Questões</TableHead>
+                      <TableHead className="text-center">Acertos</TableHead>
+                      <TableHead className="text-center">Erros</TableHead>
+                      <TableHead className="text-center">Aproveitamento</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topic.history.map((log: any, idx: number) => (
+                      <TableRow key={idx} className="border-b-0">
+                        <TableCell className="py-2">{new Date(log.date).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell className="text-center py-2">{log.total}</TableCell>
+                        <TableCell className="text-center text-green-600 py-2">{log.correct}</TableCell>
+                        <TableCell className="text-center text-red-500 py-2">{log.total - log.correct}</TableCell>
+                        <TableCell className="text-center py-2">
+                          <span className={`font-semibold ${getPerformanceColor(log.accuracy)}`}>
+                            {log.accuracy.toFixed(0)}%
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+};
+
 const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
   const [data, setData] = useState<UserFullData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +119,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
     return date.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-  
+
   // Goals management for admin
   const { goals, loading: goalsLoading, updateGoals } = useGoals(user.user_id, true);
   const [editGoals, setEditGoals] = useState({
@@ -107,7 +178,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
     setSavingGoals(true);
     const success = await updateGoals(editGoals);
     setSavingGoals(false);
-    
+
     if (success) {
       toast({
         title: "Metas atualizadas!",
@@ -151,6 +222,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
   const totalCorrect = filteredExercises.reduce((sum, ex) => sum + ex.correct_answers, 0);
   const overallAccuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
   const uniqueTopics = new Set(filteredExercises.map(ex => ex.topic)).size;
+  const classesStudied = filteredClasses.filter(c => c.studied).length;
 
   // Performance by area
   const areaStats = Object.values(MedicalArea).map(area => {
@@ -170,24 +242,36 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
   const topicStats = filteredExercises.reduce((acc, ex) => {
     const key = `${ex.specialty}|${ex.topic}`;
     if (!acc[key]) {
-      acc[key] = { 
-        topic: ex.topic, 
+      acc[key] = {
+        topic: ex.topic,
         area: ex.specialty,
-        total: 0, 
+        total: 0,
         correct: 0,
-        lastPractice: ex.date 
+        lastPractice: ex.date,
+        history: []
       };
     }
     acc[key].total += ex.total_questions;
     acc[key].correct += ex.correct_answers;
     if (ex.date > acc[key].lastPractice) acc[key].lastPractice = ex.date;
+
+    // Add to history
+    acc[key].history.push({
+      date: ex.date,
+      total: ex.total_questions,
+      correct: ex.correct_answers,
+      accuracy: ex.total_questions > 0 ? (ex.correct_answers / ex.total_questions) * 100 : 0
+    });
+
     return acc;
   }, {} as Record<string, any>);
 
   const topicData = Object.values(topicStats)
     .map((t: any) => ({
       ...t,
-      accuracy: Math.round((t.correct / t.total) * 100),
+      // Sort history by date descending
+      history: t.history.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      accuracy: Math.round((t.total > 0 ? t.correct / t.total : 0) * 100),
       errors: t.total - t.correct
     }))
     .sort((a: any, b: any) => a.accuracy - b.accuracy);
@@ -229,12 +313,12 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       // Header
       pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
       pdf.rect(0, 0, pageWidth, 30, 'F');
-      
+
       pdf.setFontSize(20);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(255, 255, 255);
       pdf.text('Mentoria Regisdência - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
-      
+
       pdf.setFontSize(14);
       pdf.text(`Aluno: ${user.name}`, pageWidth / 2, 21, { align: 'center' });
 
@@ -244,7 +328,13 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       pdf.text(
         `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`,
         pageWidth / 2,
-        27,
+        24, // Adjusted Y position
+        { align: 'center' }
+      );
+      pdf.text(
+        `(Aulas Estudadas: ${classesStudied})`, // Added to PDF header
+        pageWidth / 2,
+        28,
         { align: 'center' }
       );
 
@@ -258,29 +348,29 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       pdf.roundedRect(14, yPosition, pageWidth - 28, 40, 3, 3, 'S');
 
       const kpiX = 20;
-      const kpiSpacing = 45;
+      const kpiSpacing = 35; // Reduced spacing to fit 5 items
 
       // KPIs
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(100, 100, 100);
-      
+
       pdf.text('QUESTÕES', kpiX, yPosition + 10);
-      pdf.setFontSize(20);
+      pdf.setFontSize(16);
       pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
       pdf.text(totalQuestions.toString(), kpiX, yPosition + 22);
 
       pdf.setFontSize(9);
       pdf.setTextColor(100, 100, 100);
       pdf.text('ACERTOS', kpiX + kpiSpacing, yPosition + 10);
-      pdf.setFontSize(20);
+      pdf.setFontSize(16);
       pdf.setTextColor(16, 185, 129);
       pdf.text(totalCorrect.toString(), kpiX + kpiSpacing, yPosition + 22);
 
       pdf.setFontSize(9);
       pdf.setTextColor(100, 100, 100);
       pdf.text('APROVEITAMENTO', kpiX + kpiSpacing * 2, yPosition + 10);
-      pdf.setFontSize(20);
+      pdf.setFontSize(16);
       if (overallAccuracy >= 80) pdf.setTextColor(16, 185, 129);
       else if (overallAccuracy >= 60) pdf.setTextColor(245, 158, 11);
       else pdf.setTextColor(239, 68, 68);
@@ -289,9 +379,17 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       pdf.setFontSize(9);
       pdf.setTextColor(100, 100, 100);
       pdf.text('TEMAS', kpiX + kpiSpacing * 3, yPosition + 10);
-      pdf.setFontSize(20);
+      pdf.setFontSize(16);
       pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
       pdf.text(uniqueTopics.toString(), kpiX + kpiSpacing * 3, yPosition + 22);
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('AULAS', kpiX + kpiSpacing * 4, yPosition + 10);
+      pdf.setFontSize(16);
+      pdf.setTextColor(royalBlueHeader[0], royalBlueHeader[1], royalBlueHeader[2]);
+      pdf.text(classesStudied.toString(), kpiX + kpiSpacing * 4, yPosition + 22);
+
 
       // Gamification stats
       pdf.setFontSize(9);
@@ -497,8 +595,10 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
 
       addFooter();
 
+      // Using FileSaver.js for cross-browser compatibility
       const fileName = `PERRYMED_${user.name.replace(/\s+/g, '_')}_${startDate}_a_${endDate}.pdf`;
-      pdf.save(fileName);
+      const blob = pdf.output('blob');
+      saveAs(blob, fileName);
 
       toast({
         title: "Relatório gerado!",
@@ -563,18 +663,18 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Data Inicial</Label>
-              <Input 
-                type="date" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)} 
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>Data Final</Label>
-              <Input 
-                type="date" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
           </div>
@@ -582,7 +682,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total de Questões</CardDescription>
@@ -615,6 +715,15 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
             <CardTitle className="text-3xl flex items-center gap-2">
               <BookOpen className="w-6 h-6 text-blue-500" />
               {uniqueTopics}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Aulas Estudadas</CardDescription>
+            <CardTitle className="text-3xl flex items-center gap-2">
+              <Trophy className="w-6 h-6 text-amber-500" />
+              {classesStudied}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -818,6 +927,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10"></TableHead>
                         <TableHead className="w-10">#</TableHead>
                         <TableHead>Tema</TableHead>
                         <TableHead>Área</TableHead>
@@ -829,19 +939,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
                     </TableHeader>
                     <TableBody>
                       {topicData.map((topic: any, idx: number) => (
-                        <TableRow key={`${topic.area}-${topic.topic}`}>
-                          <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                          <TableCell className="font-medium">{topic.topic}</TableCell>
-                          <TableCell className="text-muted-foreground">{topic.area}</TableCell>
-                          <TableCell className="text-center">{topic.total}</TableCell>
-                          <TableCell className="text-center text-green-600">{topic.correct}</TableCell>
-                          <TableCell className="text-center text-red-500">{topic.errors}</TableCell>
-                          <TableCell className="text-center">
-                            <span className={`font-bold ${getPerformanceColor(topic.accuracy)}`}>
-                              {topic.accuracy}%
-                            </span>
-                          </TableCell>
-                        </TableRow>
+                        <TopicRow key={`${topic.area}-${topic.topic}`} topic={topic} index={idx} />
                       ))}
                     </TableBody>
                   </Table>

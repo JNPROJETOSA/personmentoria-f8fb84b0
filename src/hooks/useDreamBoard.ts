@@ -22,12 +22,33 @@ export function useDreamBoard(userId: string | undefined) {
       if (error) {
         console.error('Error fetching dream board items:', error);
       } else {
-        setItems(data.map(item => ({
-          id: item.id,
-          type: item.type as 'image' | 'note',
-          content: item.content,
-          createdAt: item.created_at || new Date().toISOString()
-        })));
+        setItems(data.map(item => {
+          let parsedContent = item.content;
+          let parsedMetadata: any = {};
+
+          try {
+            // Try to parse content as JSON for rich notes
+            const parsed = JSON.parse(item.content);
+            if (typeof parsed === 'object' && parsed !== null && parsed.content) {
+              parsedContent = parsed.content;
+              parsedMetadata = parsed;
+            }
+          } catch (e) {
+            // If not JSON, use raw content (legacy behavior)
+          }
+
+          return {
+            id: item.id,
+            type: item.type as 'image' | 'note',
+            content: parsedContent,
+            title: parsedMetadata.title,
+            color: parsedMetadata.color,
+            fontColor: parsedMetadata.fontColor,
+            fontSize: parsedMetadata.fontSize,
+            isAutoFit: parsedMetadata.isAutoFit,
+            createdAt: item.created_at || new Date().toISOString()
+          };
+        }));
       }
       setLoading(false);
     };
@@ -38,12 +59,28 @@ export function useDreamBoard(userId: string | undefined) {
   const addItem = async (item: Omit<DreamBoardItem, 'id'>) => {
     if (!userId) return;
 
+    // For notes, we serialize the metadata into the content field
+    // since the table doesn't have dedicated columns for styling
+    let contentToSave = item.content;
+
+    if (item.type === 'note' || item.type === 'image') {
+      const richContent = {
+        content: item.content,
+        title: item.title,
+        color: item.color,
+        fontColor: item.fontColor,
+        fontSize: item.fontSize,
+        isAutoFit: item.isAutoFit
+      };
+      contentToSave = JSON.stringify(richContent);
+    }
+
     const { data, error } = await supabase
       .from('dream_board_items')
       .insert({
         user_id: userId,
         type: item.type,
-        content: item.content
+        content: contentToSave
       })
       .select()
       .single();
@@ -51,12 +88,18 @@ export function useDreamBoard(userId: string | undefined) {
     if (error) {
       console.error('Error adding dream board item:', error);
     } else {
-      setItems(prev => [...prev, {
+      // Re-construct the item for the local state
+      setItems(prev => [{
         id: data.id,
         type: data.type as 'image' | 'note',
-        content: data.content,
+        content: item.content, // Use original content for display
+        title: item.title,
+        color: item.color,
+        fontColor: item.fontColor,
+        fontSize: item.fontSize,
+        isAutoFit: item.isAutoFit,
         createdAt: data.created_at || new Date().toISOString()
-      }]);
+      }, ...prev]);
     }
   };
 

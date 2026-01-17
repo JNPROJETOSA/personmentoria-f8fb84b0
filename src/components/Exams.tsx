@@ -13,7 +13,9 @@ import { toast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 import { getPerformanceColor } from '@/lib/utils';
+import { saveAs } from 'file-saver';
 
 interface ExamsProps {
   exams: ExamLog[];
@@ -33,7 +35,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
     areas: [],
     areaDetails: []
   });
-  
+
   const [areaInputs, setAreaInputs] = useState<Record<string, { correct: number; total: number }>>({});
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
   const [isAddingNewInstitution, setIsAddingNewInstitution] = useState(false);
@@ -99,7 +101,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
 
     addExam(item);
     addXP(100); // XP_REWARDS.EXAM
-    
+
     if (!isMountedRef.current) return;
 
     const accuracy = calculatedTotal > 0 ? (calculatedCorrect / calculatedTotal) * 100 : 0;
@@ -144,45 +146,45 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
     try {
       const doc = new jsPDF();
       const accuracy = (exam.correctAnswers / exam.totalQuestions) * 100;
-      
+
       // Colors
       const perryTeal: [number, number, number] = [13, 148, 136];
       const softGrey: [number, number, number] = [245, 247, 250];
       const darkText: [number, number, number] = [51, 65, 85];
       const indigoHeader: [number, number, number] = [79, 70, 229];
-      
+
       // Header - Perry Teal bar
       doc.setFillColor(...perryTeal);
       doc.rect(0, 0, 210, 25, 'F');
-      
+
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
       doc.text('Mentoria Regisdência - Boletim de Desempenho', 105, 12, { align: 'center' });
-      
+
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       doc.text('Certificado de Rendimento Individual', 105, 19, { align: 'center' });
-      
+
       // Exam info section
       doc.setTextColor(...darkText);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text(`${exam.name}`, 20, 38);
-      
+
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       doc.text(`Instituição: ${exam.institution}`, 20, 46);
       doc.text(`Data: ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 20, 52);
-      
+
       // Executive Summary Card
       doc.setFillColor(...softGrey);
       doc.roundedRect(20, 60, 170, 28, 3, 3, 'F');
-      
+
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text('RESUMO EXECUTIVO', 105, 67, { align: 'center' });
-      
+
       const kpiX = [45, 105, 165];
       const kpiLabels = ['Questões Totais', 'Acertos', 'Aproveitamento'];
       const kpiValues = [
@@ -190,15 +192,15 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
         exam.correctAnswers.toString(),
         `${accuracy.toFixed(1)}%`
       ];
-      
+
       kpiLabels.forEach((label, idx) => {
         doc.setFontSize(9);
         doc.setTextColor(100, 100, 100);
         doc.text(label, kpiX[idx], 75, { align: 'center' });
-        
+
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        
+
         if (idx === 2) {
           // Color-code the accuracy
           if (accuracy >= 80) {
@@ -211,19 +213,19 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
         } else {
           doc.setTextColor(...darkText);
         }
-        
+
         doc.text(kpiValues[idx], kpiX[idx], 84, { align: 'center' });
       });
-      
+
       doc.setFont('helvetica', 'normal');
-      
+
       // Performance by Area table
       if (exam.areaDetails && exam.areaDetails.length > 0) {
         doc.setTextColor(...darkText);
         doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
         doc.text('Desempenho Detalhado por Área Médica', 20, 100);
-        
+
         const tableData = exam.areaDetails.map(ad => {
           const areaAccuracy = ad.total > 0 ? (ad.correct / ad.total) * 100 : 0;
           return [
@@ -233,7 +235,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
             `${areaAccuracy.toFixed(1)}%`
           ];
         });
-        
+
         autoTable(doc, {
           startY: 105,
           head: [['Área Médica', 'Questões', 'Acertos', 'Nota (%)']],
@@ -262,7 +264,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
           margin: { left: 20, right: 20 }
         });
       }
-      
+
       // Footer
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
@@ -276,9 +278,12 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
           { align: 'center' }
         );
       }
-      
-      doc.save(`boletim-${exam.name.toLowerCase().replace(/\s/g, '-')}.pdf`);
-      
+
+      // Using FileSaver.js for cross-browser compatibility
+      const filename = `boletim-${exam.name.toLowerCase().replace(/\s/g, '-')}.pdf`;
+      const blob = doc.output('blob');
+      saveAs(blob, filename);
+
       toast({
         title: "PDF gerado!",
         description: "O boletim foi baixado com sucesso.",
@@ -321,8 +326,8 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
 
             <div className="space-y-2">
               <Label htmlFor="institution">Instituição/Banca</Label>
-              <Select 
-                value={newExam.institution} 
+              <Select
+                value={newExam.institution}
                 onValueChange={(value) => {
                   if (value === 'CUSTOM') {
                     setIsAddingNewInstitution(true);
@@ -343,7 +348,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                   <SelectItem value="CUSTOM">+ Cadastrar nova banca</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               {isAddingNewInstitution && (
                 <Dialog open={isAddingNewInstitution} onOpenChange={setIsAddingNewInstitution}>
                   <DialogContent>
@@ -361,7 +366,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                         autoFocus
                       />
                       <div className="flex gap-2">
-                        <Button 
+                        <Button
                           onClick={() => {
                             if (customInstitution.trim()) {
                               setNewExam({ ...newExam, institution: customInstitution.trim() });
@@ -373,8 +378,8 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                         >
                           Confirmar
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           onClick={() => {
                             setIsAddingNewInstitution(false);
                             setCustomInstitution('');
@@ -421,7 +426,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                       {area}
                     </label>
                   </div>
-                  
+
                   {newExam.areas?.includes(area) && (
                     <div className="grid grid-cols-2 gap-2 pl-6">
                       <div className="space-y-1">
@@ -476,7 +481,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
             {sortedExams.map(exam => {
               const accuracy = (exam.correctAnswers / exam.totalQuestions) * 100;
               const isExpanded = expandedExams.has(exam.id);
-              
+
               return (
                 <Collapsible key={exam.id} open={isExpanded} onOpenChange={() => toggleExamExpansion(exam.id)}>
                   <div className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
@@ -486,7 +491,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                           <h3 className="font-semibold text-lg">{exam.name}</h3>
                           <span className="text-sm text-muted-foreground">({exam.institution})</span>
                         </div>
-                        
+
                         <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                           <span>{new Date(exam.date).toLocaleDateString('pt-BR')}</span>
                           <span>•</span>
@@ -509,13 +514,13 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                         >
                           <Download className="w-4 h-4" />
                         </Button>
-                        
+
                         <CollapsibleTrigger asChild>
                           <Button variant="outline" size="icon">
                             <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           </Button>
                         </CollapsibleTrigger>
-                        
+
                         <Button
                           variant="ghost"
                           size="icon"

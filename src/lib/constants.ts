@@ -3,9 +3,9 @@ import { MedicalArea } from './types';
 export const AREA_COLORS: Record<MedicalArea, string> = {
   [MedicalArea.PEDIATRIA]: '#3B82F6', // Blue
   [MedicalArea.GO]: '#EC4899', // Pink
-  [MedicalArea.PREVENTIVA]: '#10B981', // Emerald
-  [MedicalArea.CLINICA]: '#F59E0B', // Amber
-  [MedicalArea.CIRURGIA]: '#6366F1', // Indigo
+  [MedicalArea.CIRURGIA]: '#10B981', // Green (Emerald)
+  [MedicalArea.CLINICA]: '#F59E0B', // Yellow (Amber)
+  [MedicalArea.PREVENTIVA]: '#A855F7', // Purple
 };
 
 export const REVIEW_INTERVALS = [1, 7, 14, 30];
