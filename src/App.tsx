@@ -73,19 +73,37 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
+
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Login from "./pages/Login";
+import UserManagement from "./pages/admin/UserManagement";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TooltipProvider delayDuration={0}>
         <BrowserRouter>
-          <AppErrorBoundary>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AppErrorBoundary>
+          <AuthProvider>
+            <AppErrorBoundary>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<Login />} />
+
+                {/* Protected Routes (Students & Admins) */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/" element={<Index />} />
+                </Route>
+
+                {/* Admin Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                  <Route path="/user-management" element={<UserManagement />} />
+                </Route>
+
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AppErrorBoundary>
+          </AuthProvider>
         </BrowserRouter>
         <Toaster />
       </TooltipProvider>

@@ -107,7 +107,8 @@ export default function Analysis({ exercises }: AnalysisProps) {
         topic: ex.topic,
         total: 0,
         correct: 0,
-        lastPractice: ex.date
+        lastPractice: ex.date,
+        history: []
       };
     }
     acc[ex.topic].total += ex.totalQuestions;

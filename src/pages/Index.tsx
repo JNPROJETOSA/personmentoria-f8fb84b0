@@ -21,11 +21,12 @@ import ProfileSettings from '@/components/ProfileSettings';
 import AdminDashboard from '@/components/AdminDashboard';
 import FrozenAccountScreen from '@/components/FrozenAccountScreen';
 import MindMaps from '@/components/MindMaps';
+
 import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
 import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useClasses } from '@/hooks/useClasses';
 import { useExercises } from '@/hooks/useExercises';
@@ -88,7 +89,7 @@ const AuthenticatedApp = () => {
   const { examModeData, addSession: addExamSession, updateMantra, setExamModeData, loading: examModeLoading } = useExamMode(user?.id);
 
   // Admin hooks
-  const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
+  const { isAdmin, loading: authLoading } = useAuth();
   const { users: adminUsers, loading: adminLoading, toggleFreezeUser } = useAdminData(isAdmin);
 
   // Check if user is frozen
@@ -424,6 +425,7 @@ const AuthenticatedApp = () => {
           {renderContent()}
         </div>
       </main>
+
     </div>
   );
 };
