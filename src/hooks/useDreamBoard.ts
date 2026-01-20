@@ -17,6 +17,7 @@ export function useDreamBoard(userId: string | undefined) {
         .from('dream_board_items')
         .select('*')
         .eq('user_id', userId)
+        .in('type', ['image', 'note'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -104,7 +105,23 @@ export function useDreamBoard(userId: string | undefined) {
   };
 
   const deleteItem = async (id: string) => {
-    if (!userId) return;
+    if (!userId) return false;
+
+    // Find the item to be deleted
+    const itemToDelete = items.find(i => i.id === id);
+
+    // If it's an image stored in our bucket, delete it from storage first
+    if (itemToDelete && itemToDelete.type === 'image' && itemToDelete.content && !itemToDelete.content.startsWith('http')) {
+      const { error: storageError } = await supabase.storage
+        .from('dream-board-images')
+        .remove([itemToDelete.content]);
+
+      if (storageError) {
+        console.error('Error deleting image file:', storageError);
+        // We continue to delete the record even if storage delete failed, 
+        // or we could block. Usually better to clean up the record at least.
+      }
+    }
 
     const { error } = await supabase
       .from('dream_board_items')
@@ -114,8 +131,10 @@ export function useDreamBoard(userId: string | undefined) {
 
     if (error) {
       console.error('Error deleting dream board item:', error);
+      return false;
     } else {
       setItems(prev => prev.filter(item => item.id !== id));
+      return true;
     }
   };
 

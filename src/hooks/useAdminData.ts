@@ -16,6 +16,9 @@ export interface UserSummary {
   flashcardCount: number;
   totalAccuracy: number;
   frozen: boolean;
+  exam_year: string | null;
+  target_institutions: string[] | null;
+  target_specialty: string | null;
 }
 
 export function useAdminData(isAdmin: boolean) {
@@ -102,7 +105,10 @@ export function useAdminData(isAdmin: boolean) {
             totalClasses: userClasses.length,
             flashcardCount: userFlashcards.length,
             totalAccuracy: Math.round(accuracy * 10) / 10,
-            frozen: profile.frozen || false
+            frozen: profile.frozen || false,
+            exam_year: (profile as any).exam_year || null,
+            target_institutions: (profile as any).target_institutions || null,
+            target_specialty: (profile as any).target_specialty || null
           };
         });
 
@@ -128,7 +134,7 @@ export function useAdminData(isAdmin: boolean) {
       return false;
     }
 
-    setUsers(prev => prev.map(u => 
+    setUsers(prev => prev.map(u =>
       u.user_id === userId ? { ...u, frozen } : u
     ));
     return true;

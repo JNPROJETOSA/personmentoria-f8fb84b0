@@ -29,21 +29,26 @@ export function useExamMode(userId: string | undefined) {
       if (error) {
         console.error('Error fetching exam sessions:', error);
       } else {
-        const sessions: ExamSession[] = data.map(s => ({
-          id: s.id,
-          date: s.completed_at.split('T')[0],
-          config: s.config as any,
-          distractions: (s.distractions as any) || [],
-          emotions: (s.post_emotions as any) || undefined,
-          diary: s.diary_notes || undefined,
-          strategy: (s.emotional_state as any)?.strategy || undefined,
-          completed: true,
-          actualDuration: (s.config as any).totalTime || 0
-        }));
-        
+        const sessions: ExamSession[] = data.map(s => {
+          const sAny = s as any;
+          return {
+            id: s.id,
+            date: s.completed_at.split('T')[0],
+            config: s.config as any,
+            distractions: (s.distractions as any) || [],
+            emotions: (s.post_emotions as any) || undefined,
+            diary: s.diary_notes || undefined,
+            strategy: (s.emotional_state as any)?.strategy || undefined,
+            completed: true,
+            actualDuration: (s.config as any).totalTime || 0,
+            totalQuestions: sAny.total_questions || 0,
+            correctAnswers: sAny.correct_answers || 0
+          };
+        });
+
         // Get mantra from most recent session or default
         const mantra = sessions[0]?.config?.mantra || '';
-        
+
         setExamModeData({ sessions, mantra });
       }
       setLoading(false);
@@ -64,24 +69,29 @@ export function useExamMode(userId: string | undefined) {
         distractions: session.distractions as any,
         post_emotions: session.emotions as any,
         diary_notes: session.diary,
-        emotional_state: { strategy: session.strategy }
-      })
+        emotional_state: { strategy: session.strategy },
+        total_questions: session.totalQuestions || 0,
+        correct_answers: session.correctAnswers || 0
+      } as any)
       .select()
       .single();
 
     if (error) {
       console.error('Error adding exam session:', error);
     } else {
+      const dataAny = data as any;
       const newSession: ExamSession = {
-        id: data.id,
-        date: data.completed_at.split('T')[0],
-        config: data.config as any,
-        distractions: (data.distractions as any) || [],
-        emotions: (data.post_emotions as any) || undefined,
-        diary: data.diary_notes || undefined,
-        strategy: (data.emotional_state as any)?.strategy || undefined,
+        id: dataAny.id,
+        date: dataAny.completed_at.split('T')[0],
+        config: dataAny.config as any,
+        distractions: (dataAny.distractions as any) || [],
+        emotions: (dataAny.post_emotions as any) || undefined,
+        diary: dataAny.diary_notes || undefined,
+        strategy: (dataAny.emotional_state as any)?.strategy || undefined,
         completed: true,
-        actualDuration: (data.config as any).totalTime || 0
+        actualDuration: (dataAny.config as any).totalTime || 0,
+        totalQuestions: dataAny.total_questions || 0,
+        correctAnswers: dataAny.correct_answers || 0
       };
 
       setExamModeData(prev => ({

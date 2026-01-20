@@ -27,7 +27,7 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
 
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const generateReport = () => {
+  const generateReport = async () => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -61,108 +61,40 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
 
     // Generate PDF with professional design
     try {
-      const pdf = new jsPDF();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+      const { PdfService } = await import('@/lib/pdf-service');
+      const pdf = new PdfService();
 
-      // Perry Teal color (#0d9488 = RGB: 13, 148, 136)
-      const perryTeal: [number, number, number] = [13, 148, 136];
-      const indigoHeader: [number, number, number] = [79, 70, 229];
-      const slateHeader: [number, number, number] = [51, 65, 85];
-      const royalBlueHeader: [number, number, number] = [37, 99, 235];
-      const emeraldHeader: [number, number, number] = [16, 185, 129];
+      await pdf.initialize('Relatório de Desempenho');
 
-      // Helper function to add footer to each page
-      const addFooter = () => {
-        const pageCount = (pdf as any).internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-          pdf.setPage(i);
-          pdf.setFontSize(8);
-          pdf.setTextColor(150, 150, 150);
-          pdf.text(
-            `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
-            pageWidth / 2,
-            pageHeight - 10,
-            { align: 'center' }
-          );
-        }
-      };
+      // Subtitle
+      pdf.addSubtitle(`Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')} • Gerado em: ${new Date().toLocaleDateString('pt-BR')}`);
 
-      // 1. CABEÇALHO INSTITUCIONAL (Header Institucional)
-      // Barra superior Perry Teal
-      pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
-      pdf.rect(0, 0, pageWidth, 25, 'F');
+      // --- Executive Summary (Grid) ---
+      const startY = pdf.getCurrentY();
+      const margin = pdf.getMargin();
+      const contentWidth = pdf.getContentWidth();
+      const colGap = 10;
+      const colWidth = (contentWidth - (colGap * 2)) / 3;
 
-      // Título em branco
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('Mentoria Regisdência - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
+      // Card 1: Questões Totais
+      pdf.drawCard(margin, startY, colWidth, 40, 'Questões Totais');
+      pdf.addMetricAt(margin + (colWidth / 2), startY + 15, '', totalQuestions.toString(), 'center');
 
-      // Subtítulo de período
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(240, 240, 240);
-      pdf.text(
-        `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`,
-        pageWidth / 2,
-        19,
-        { align: 'center' }
-      );
+      // Card 2: Acertos
+      pdf.drawCard(margin + colWidth + colGap, startY, colWidth, 40, 'Acertos');
+      pdf.addMetricAt(margin + colWidth + colGap + (colWidth / 2), startY + 15, '', totalCorrect.toString(), 'center');
 
-      let yPosition = 35;
+      // Card 3: Aproveitamento
+      pdf.drawCard(margin + (colWidth * 2) + (colGap * 2), startY, colWidth, 40, 'Aproveitamento');
+      pdf.addMetricAt(margin + (colWidth * 2) + (colGap * 2) + (colWidth / 2), startY + 15, '', `${accuracy.toFixed(1)}%`, 'center');
 
-      // 2. QUADRO DE RESUMO (Executive Summary Card)
-      // Fundo cinza suave com bordas arredondadas
-      pdf.setFillColor(245, 247, 250);
-      pdf.roundedRect(14, yPosition, pageWidth - 28, 35, 3, 3, 'F');
+      pdf.moveY(55);
 
-      // Borda sutil
-      pdf.setDrawColor(220, 220, 220);
-      pdf.setLineWidth(0.5);
-      pdf.roundedRect(14, yPosition, pageWidth - 28, 35, 3, 3, 'S');
-
-      // KPIs dentro do card
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(100, 100, 100);
-
-      const kpiX = 25;
-      const kpiSpacing = 55;
-
-      // Questões Totais
-      pdf.text('QUESTÕES TOTAIS', kpiX, yPosition + 10);
-      pdf.setFontSize(24);
-      pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
-      pdf.text(totalQuestions.toString(), kpiX, yPosition + 23);
-
-      // Acertos
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('ACERTOS', kpiX + kpiSpacing, yPosition + 10);
-      pdf.setFontSize(24);
-      pdf.setTextColor(16, 185, 129); // Emerald
-      pdf.text(totalCorrect.toString(), kpiX + kpiSpacing, yPosition + 23);
-
-      // Aproveitamento
-      pdf.setFontSize(10);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('APROVEITAMENTO', kpiX + kpiSpacing * 2, yPosition + 10);
-      pdf.setFontSize(24);
-      // Color based on performance
-      if (accuracy >= 80) pdf.setTextColor(16, 185, 129); // Green
-      else if (accuracy >= 60) pdf.setTextColor(245, 158, 11); // Amber
-      else pdf.setTextColor(239, 68, 68); // Red
-      pdf.text(`${accuracy.toFixed(1)}%`, kpiX + kpiSpacing * 2, yPosition + 23);
-
-      yPosition += 45;
-
-      // 3. TABELA 1: Desempenho Estratégico por Grande Área
+      // --- Table 1: Desempenho por Área ---
       const areaStats = Object.values(MedicalArea).map(area => {
         const areaExercises = filteredExercises.filter(ex => ex.area === area);
         const total = areaExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
         const correct = areaExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
-
         return {
           area,
           total,
@@ -172,167 +104,103 @@ export default function Reports({ exercises, classes, exams }: ReportsProps) {
       }).filter(a => a.total > 0);
 
       if (areaStats.length > 0) {
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Área Médica', 'Questões', 'Acertos', 'Nota (%)']],
-          body: areaStats.map(stat => [
+        pdf.addSection('Desempenho Estratégico por Área');
+        pdf.addTable(
+          ['Área Médica', 'Questões', 'Acertos', 'Nota (%)'],
+          areaStats.map(stat => [
             stat.area,
             stat.total.toString(),
             stat.correct.toString(),
             `${stat.accuracy.toFixed(1)}%`
           ]),
-          theme: 'striped',
-          headStyles: {
-            fillColor: indigoHeader,
-            textColor: 255,
-            fontSize: 11,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: {
-            fontSize: 10,
-            cellPadding: 5
-          },
-          columnStyles: {
-            0: { halign: 'left', fontStyle: 'bold' },
-            1: { halign: 'center' },
-            2: { halign: 'center' },
-            3: { halign: 'center', fontStyle: 'bold' }
-          },
-          alternateRowStyles: {
-            fillColor: [250, 250, 250]
+          {
+            columnStyles: {
+              0: { halign: 'left', fontStyle: 'bold' },
+              1: { halign: 'center', cellWidth: 30 },
+              2: { halign: 'center', cellWidth: 30 },
+              3: { halign: 'center', cellWidth: 30, fontStyle: 'bold' }
+            },
+            didDrawCell: (data: any) => {
+              if (data.column.index === 3 && data.section === 'body') {
+                const val = parseFloat(data.cell.raw.replace('%', ''));
+                if (val >= 80) data.cell.styles.textColor = [16, 185, 129];
+                else if (val >= 60) data.cell.styles.textColor = [245, 158, 11];
+                else data.cell.styles.textColor = [239, 68, 68];
+              }
+            }
           }
-        });
-
-        yPosition = (pdf as any).lastAutoTable.finalY + 15;
+        );
       }
 
-      // 4. TABELA 2: Provas na Íntegra (Simulados)
+      // --- Table 2: Provas na Íntegra (Simulados) ---
       if (filteredExams.length > 0) {
-        if (yPosition > pageHeight - 60) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Data', 'Nome da Prova', 'Placar Bruto', 'Porcentagem']],
-          body: filteredExams.map(exam => [
+        pdf.moveY(10);
+        pdf.addSection('Provas na Íntegra (Simulados)');
+        pdf.addTable(
+          ['Data', 'Nome da Prova', 'Placar', 'Nota (%)'],
+          filteredExams.map(exam => [
             new Date(exam.date).toLocaleDateString('pt-BR'),
             exam.name,
             `${exam.correctAnswers}/${exam.totalQuestions}`,
             `${((exam.correctAnswers / exam.totalQuestions) * 100).toFixed(1)}%`
           ]),
-          theme: 'grid',
-          headStyles: {
-            fillColor: slateHeader,
-            textColor: 255,
-            fontSize: 11,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: {
-            fontSize: 10,
-            cellPadding: 5
-          },
-          columnStyles: {
-            0: { halign: 'center' },
-            1: { halign: 'left', fontStyle: 'bold' },
-            2: { halign: 'center' },
-            3: { halign: 'center', fontStyle: 'bold' }
+          {
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 30 },
+              1: { halign: 'left' },
+              2: { halign: 'center', cellWidth: 30 },
+              3: { halign: 'center', cellWidth: 30, fontStyle: 'bold' }
+            }
           }
-        });
-
-        yPosition = (pdf as any).lastAutoTable.finalY + 15;
+        );
       }
 
-      // 5. TABELA 3: Histórico Detalhado (Log de Exercícios)
+      // --- Table 3: Histórico Detalhado ---
       if (filteredExercises.length > 0) {
-        if (yPosition > pageHeight - 60) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Data', 'Frente', 'Tema Específico', 'Desempenho']],
-          body: filteredExercises.map(ex => [
+        pdf.moveY(10);
+        pdf.addSection('Histórico Detalhado de Questões');
+        pdf.addTable(
+          ['Data', 'Frente', 'Tema', 'Desempenho'],
+          filteredExercises.map(ex => [
             new Date(ex.date).toLocaleDateString('pt-BR'),
             ex.area,
             ex.topic,
             `${ex.correctAnswers}/${ex.totalQuestions} (${((ex.correctAnswers / ex.totalQuestions) * 100).toFixed(0)}%)`
           ]),
-          theme: 'striped',
-          headStyles: {
-            fillColor: royalBlueHeader,
-            textColor: 255,
-            fontSize: 11,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: {
-            fontSize: 9,
-            cellPadding: 4
-          },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 25 },
-            1: { halign: 'left', cellWidth: 40 },
-            2: { halign: 'left' },
-            3: { halign: 'center', fontStyle: 'bold', cellWidth: 35 }
-          },
-          alternateRowStyles: {
-            fillColor: [250, 250, 250]
+          {
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 25 },
+              1: { halign: 'left', cellWidth: 40 },
+              2: { halign: 'left' },
+              3: { halign: 'center', fontStyle: 'bold', cellWidth: 35 }
+            }
           }
-        });
-
-        yPosition = (pdf as any).lastAutoTable.finalY + 15;
+        );
       }
 
-      // 6. TABELA 4: Aulas Teóricas (Opcional/Condicional)
+      // --- Table 4: Aulas Teóricas ---
       if (filteredClasses.length > 0) {
-        if (yPosition > pageHeight - 60) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Data', 'Frente', 'Título da Aula']],
-          body: filteredClasses.map(cls => [
+        pdf.moveY(10);
+        pdf.addSection('Aulas Teóricas Concluídas');
+        pdf.addTable(
+          ['Data', 'Frente', 'Título da Aula'],
+          filteredClasses.map(cls => [
             new Date(cls.date).toLocaleDateString('pt-BR'),
             cls.area,
             cls.title
           ]),
-          theme: 'striped',
-          headStyles: {
-            fillColor: emeraldHeader,
-            textColor: 255,
-            fontSize: 11,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: {
-            fontSize: 10,
-            cellPadding: 5
-          },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 30 },
-            1: { halign: 'left', cellWidth: 40 },
-            2: { halign: 'left' }
-          },
-          alternateRowStyles: {
-            fillColor: [250, 250, 250]
+          {
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 30 },
+              1: { halign: 'left', cellWidth: 40 },
+              2: { halign: 'left' }
+            }
           }
-        });
+        );
       }
 
-      // 7. RODAPÉ (Footer) - Add to all pages
-      addFooter();
-
-      // Using FileSaver.js for cross-browser compatibility
-      const finalFilename = `Mentoria_Regisdencia_Relatorio_${startDate}_a_${endDate}.pdf`;
-      const blob = pdf.output('blob');
-      saveAs(blob, finalFilename);
+      const finalFilename = `Mentoria_Regisdencia_Relatorio_${startDate}_a_${endDate}`;
+      pdf.save(finalFilename);
 
       toast({
         title: "Relatório gerado com sucesso!",

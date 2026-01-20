@@ -11,23 +11,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Flashcard, MedicalArea } from '@/lib/types';
 import { FlashcardFolder } from '@/hooks/useFlashcardFolders';
 import { toast } from '@/hooks/use-toast';
+import { useFlashcardImages } from '@/hooks/useFlashcardImages';
 
 interface FlashcardsProps {
   flashcards: Flashcard[];
   folders: FlashcardFolder[];
   addFlashcard: (flashcard: Omit<Flashcard, 'id' | 'difficulty' | 'lastReviewed' | 'nextReview' | 'reviewCount'>) => Promise<void>;
   deleteFlashcard: (id: string) => Promise<void>;
-  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string; folderId?: string | null }) => Promise<void>;
+  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string; answer_image_url?: string | null; folderId?: string | null }) => Promise<void>;
   addFolder: (folder: { area: MedicalArea; name: string }) => Promise<FlashcardFolder | null>;
   updateFolder: (id: string, updates: { name?: string }) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
 }
 
-export default function Flashcards({ 
-  flashcards, 
-  folders, 
-  addFlashcard, 
-  deleteFlashcard, 
+export default function Flashcards({
+  flashcards,
+  folders,
+  addFlashcard,
+  deleteFlashcard,
   updateFlashcard,
   addFolder,
   updateFolder,
@@ -46,7 +47,7 @@ export default function Flashcards({
   const [expandedAreas, setExpandedAreas] = useState<Set<MedicalArea>>(new Set(Object.values(MedicalArea)));
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  
+
   const [newCard, setNewCard] = useState({
     area: MedicalArea.PEDIATRIA,
     front: '',
@@ -67,6 +68,15 @@ export default function Flashcards({
 
   const [editFolderName, setEditFolderName] = useState('');
   const [moveTargetFolder, setMoveTargetFolder] = useState<string | 'none'>('none');
+  const [studyMode, setStudyMode] = useState<'general' | 'folder'>('general');
+  const [studyFolderId, setStudyFolderId] = useState<string | null>(null);
+
+  // Image upload states
+  const { uploadImage, getImageUrl, deleteImage, uploading } = useFlashcardImages();
+  const [newCardImage, setNewCardImage] = useState<File | null>(null);
+  const [newCardImagePreview, setNewCardImagePreview] = useState<string | null>(null);
+  const [editCardImage, setEditCardImage] = useState<File | null>(null);
+  const [editCardImagePreview, setEditCardImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -74,18 +84,55 @@ export default function Flashcards({
     };
   }, []);
 
+  // Handle image file selection for new card
+  const handleNewCardImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewCardImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewCardImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle image file selection for edit card
+  const handleEditCardImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditCardImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditCardImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Get flashcards for current view
   const getFilteredCards = () => {
     let cards = flashcards;
-    
+
+    // Filter by area if not 'all'
     if (filterArea !== 'all') {
       cards = cards.filter(c => c.area === filterArea);
     }
-    
-    if (selectedFolder) {
-      cards = cards.filter(c => c.folderId === selectedFolder);
+
+    // When studying, respect the study mode
+    if (isStudying) {
+      if (studyMode === 'folder' && studyFolderId) {
+        // Filter by specific folder
+        cards = cards.filter(c => c.folderId === studyFolderId);
+      }
+      // If studyMode === 'general', use all cards (already filtered by area if applicable)
+    } else {
+      // When not studying, respect selectedFolder for tree view
+      if (selectedFolder) {
+        cards = cards.filter(c => c.folderId === selectedFolder);
+      }
     }
-    
+
     return cards;
   };
 
@@ -138,21 +185,35 @@ export default function Flashcards({
       return;
     }
 
+    let imageUrl: string | null = null;
+
+    // Upload image if selected
+    if (newCardImage) {
+      imageUrl = await uploadImage(newCardImage);
+      if (!imageUrl) {
+        // Upload failed, toast already shown by hook
+        return;
+      }
+    }
+
     await addFlashcard({
       area: newCard.area,
       front: newCard.front,
       back: newCard.back,
+      answer_image_url: imageUrl,
       folderId: newCard.folderId
     });
 
     if (!isMountedRef.current) return;
 
     setNewCard({ area: MedicalArea.PEDIATRIA, front: '', back: '', folderId: null });
+    setNewCardImage(null);
+    setNewCardImagePreview(null);
     setIsCreating(false);
-    
+
     toast({
       title: "Flashcard criado!",
-      description: "Card adicionado com sucesso"
+      description: imageUrl ? "Card com imagem adicionado" : "Card adicionado com sucesso"
     });
   };
 
@@ -185,12 +246,22 @@ export default function Flashcards({
     }
   };
 
-  const handleStartEdit = (card: Flashcard) => {
+  const handleStartEdit = async (card: Flashcard) => {
     setEditCard({
       area: card.area,
       front: card.front,
       back: card.back
     });
+    setEditCardImage(null);
+
+    // Load existing image for preview if available
+    if (card.answer_image_url) {
+      const url = await getImageUrl(card.answer_image_url);
+      setEditCardImagePreview(url);
+    } else {
+      setEditCardImagePreview(null);
+    }
+
     setIsEditing(card.id);
   };
 
@@ -201,7 +272,7 @@ export default function Flashcards({
 
   const handleUpdate = async () => {
     if (!isEditing) return;
-    
+
     if (!editCard.front.trim() || !editCard.back.trim()) {
       if (isMountedRef.current) {
         toast({
@@ -213,16 +284,43 @@ export default function Flashcards({
       return;
     }
 
-    await updateFlashcard(isEditing, {
+    let imageUrl: string | null | undefined = undefined;
+
+    // Upload new image if selected
+    if (editCardImage) {
+      const uploadedPath = await uploadImage(editCardImage);
+      if (!uploadedPath) {
+        // Upload failed
+        return;
+      }
+
+      // Delete old image if exists
+      const currentCard = flashcards.find(c => c.id === isEditing);
+      if (currentCard?.answer_image_url) {
+        await deleteImage(currentCard.answer_image_url);
+      }
+
+      imageUrl = uploadedPath;
+    }
+
+    const updates: any = {
       area: editCard.area,
       front: editCard.front,
       back: editCard.back,
-    });
+    };
+
+    if (imageUrl !== undefined) {
+      updates.answer_image_url = imageUrl;
+    }
+
+    await updateFlashcard(isEditing, updates);
 
     if (!isMountedRef.current) return;
 
     setIsEditing(null);
-    
+    setEditCardImage(null);
+    setEditCardImagePreview(null);
+
     toast({
       title: "Flashcard atualizado!",
       description: "Card editado com sucesso"
@@ -280,7 +378,7 @@ export default function Flashcards({
 
   const handleDifficultySelect = (difficulty: 'easy' | 'medium' | 'hard') => {
     setIsFlipped(false);
-    
+
     if (currentIndex < filteredCards.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -297,7 +395,7 @@ export default function Flashcards({
   // Study mode
   if (isStudying && filteredCards.length > 0) {
     const card = filteredCards[currentIndex];
-    
+
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
         <Card>
@@ -315,7 +413,7 @@ export default function Flashcards({
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div 
+            <div
               className="relative w-full h-80 cursor-pointer perspective-1000"
               onClick={() => setIsFlipped(!isFlipped)}
             >
@@ -323,8 +421,11 @@ export default function Flashcards({
                 <Card className="absolute inset-0 backface-hidden flex items-center justify-center p-8 bg-card border-2">
                   <p className="text-xl text-center">{card.front}</p>
                 </Card>
-                <Card className="absolute inset-0 backface-hidden rotate-y-180 flex items-center justify-center p-8 bg-primary text-primary-foreground border-2">
-                  <p className="text-xl text-center">{card.back}</p>
+                <Card className="absolute inset-0 backface-hidden rotate-y-180 flex flex-col items-center justify-center p-8 bg-primary text-primary-foreground border-2 overflow-auto">
+                  <p className="text-xl text-center mb-4">{card.back}</p>
+                  {card.answer_image_url && (
+                    <FlashcardImage imagePath={card.answer_image_url} getImageUrl={getImageUrl} />
+                  )}
                 </Card>
               </div>
             </div>
@@ -415,15 +516,15 @@ export default function Flashcards({
                     Novo Card
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Criar Flashcard</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>Área Médica</Label>
-                      <Select 
-                        value={newCard.area} 
+                      <Select
+                        value={newCard.area}
                         onValueChange={(v) => setNewCard({ ...newCard, area: v as MedicalArea, folderId: null })}
                       >
                         <SelectTrigger>
@@ -438,8 +539,8 @@ export default function Flashcards({
                     </div>
                     <div className="space-y-2">
                       <Label>Pasta (opcional)</Label>
-                      <Select 
-                        value={newCard.folderId || 'none'} 
+                      <Select
+                        value={newCard.folderId || 'none'}
                         onValueChange={(v) => setNewCard({ ...newCard, folderId: v === 'none' ? null : v })}
                       >
                         <SelectTrigger>
@@ -476,6 +577,35 @@ export default function Flashcards({
                         rows={4}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Imagem da Resposta (opcional, max 200KB)</Label>
+                      <Input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleNewCardImageChange}
+                        disabled={uploading}
+                      />
+                      {newCardImagePreview && (
+                        <div className="relative mt-2">
+                          <img
+                            src={newCardImagePreview}
+                            alt="Preview"
+                            className="max-h-40 rounded border"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-1 right-1"
+                            onClick={() => {
+                              setNewCardImage(null);
+                              setNewCardImagePreview(null);
+                            }}
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     <Button onClick={handleCreate} className="w-full">
                       Criar Flashcard
                     </Button>
@@ -498,12 +628,102 @@ export default function Flashcards({
                 ))}
               </SelectContent>
             </Select>
-            
+
             {flashcards.length > 0 && (
-              <Button onClick={() => { setIsStudying(true); setCurrentIndex(0); setIsFlipped(false); setSelectedFolder(null); }}>
-                <RotateCw className="w-4 h-4 mr-2" />
-                Iniciar Estudo ({filteredCards.length} cards)
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setStudyMode('general');
+                    setStudyFolderId(null);
+                    setIsStudying(true);
+                    setCurrentIndex(0);
+                    setIsFlipped(false);
+                  }}
+                  className="gap-2"
+                >
+                  <RotateCw className="w-4 h-4" />
+                  Estudo Geral ({filteredCards.length} cards)
+                </Button>
+
+                {folders.length > 0 && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Folder className="w-4 h-4" />
+                        Estudo Específico
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Escolher Pasta para Estudar</DialogTitle>
+                        <CardDescription>
+                          Selecione uma pasta para estudar apenas os flashcards dela
+                        </CardDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Área Médica</Label>
+                          <Select
+                            value={filterArea === 'all' ? MedicalArea.PEDIATRIA : filterArea}
+                            onValueChange={(v) => setFilterArea(v as MedicalArea)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.values(MedicalArea).map(area => (
+                                <SelectItem key={area} value={area}>{area}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Pasta</Label>
+                          {getFoldersForArea(filterArea === 'all' ? MedicalArea.PEDIATRIA : filterArea).length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-2">
+                              Nenhuma pasta disponível nesta área. Crie uma pasta primeiro.
+                            </p>
+                          ) : (
+                            <Select
+                              value={studyFolderId || 'none'}
+                              onValueChange={(v) => setStudyFolderId(v === 'none' ? null : v)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma pasta" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Selecione...</SelectItem>
+                                {getFoldersForArea(filterArea === 'all' ? MedicalArea.PEDIATRIA : filterArea).map(folder => (
+                                  <SelectItem key={folder.id} value={folder.id}>
+                                    <span className="flex items-center gap-2">
+                                      <Folder className="w-4 h-4" />
+                                      {folder.name} ({getCardsInFolder(folder.id).length} cards)
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                        {studyFolderId && (
+                          <Button
+                            onClick={() => {
+                              setStudyMode('folder');
+                              setIsStudying(true);
+                              setCurrentIndex(0);
+                              setIsFlipped(false);
+                            }}
+                            className="w-full gap-2"
+                          >
+                            <RotateCw className="w-4 h-4" />
+                            Iniciar Estudo ({getCardsInFolder(studyFolderId).length} cards)
+                          </Button>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             )}
           </div>
 
@@ -513,7 +733,7 @@ export default function Flashcards({
               const areaFolders = getFoldersForArea(area);
               const looseCards = getLooseCards(area);
               const totalCardsInArea = flashcards.filter(c => c.area === area).length;
-              
+
               if (filterArea !== 'all' && filterArea !== area) return null;
               if (totalCardsInArea === 0 && areaFolders.length === 0) return null;
 
@@ -542,7 +762,7 @@ export default function Flashcards({
                       {/* Folders */}
                       {areaFolders.map(folder => {
                         const folderCards = getCardsInFolder(folder.id);
-                        
+
                         return (
                           <div key={folder.id} className="ml-4">
                             <div
@@ -656,7 +876,7 @@ export default function Flashcards({
 
       {/* Edit Card Dialog */}
       <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Flashcard</DialogTitle>
           </DialogHeader>
@@ -689,6 +909,35 @@ export default function Flashcards({
                 onChange={(e) => setEditCard({ ...editCard, back: e.target.value })}
                 rows={4}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Imagem da Resposta (opcional, max 200KB)</Label>
+              <Input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleEditCardImageChange}
+                disabled={uploading}
+              />
+              {editCardImagePreview && (
+                <div className="relative mt-2">
+                  <img
+                    src={editCardImagePreview}
+                    alt="Preview"
+                    className="max-h-40 rounded border"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-1 right-1"
+                    onClick={() => {
+                      setEditCardImage(null);
+                      setEditCardImagePreview(null);
+                    }}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              )}
             </div>
             <Button onClick={handleUpdate} className="w-full">
               Salvar Alterações
@@ -760,13 +1009,13 @@ export default function Flashcards({
 }
 
 // Subcomponent for flashcard item
-function FlashcardItem({ 
-  card, 
-  onEdit, 
-  onDelete, 
-  onMove 
-}: { 
-  card: Flashcard; 
+function FlashcardItem({
+  card,
+  onEdit,
+  onDelete,
+  onMove
+}: {
+  card: Flashcard;
   onEdit: (card: Flashcard) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, folderId: string | null) => void;
@@ -807,5 +1056,36 @@ function FlashcardItem({
         </AlertDialog>
       </div>
     </div>
+  );
+}
+
+// Helper component for displaying flashcard images in study mode
+function FlashcardImage({ imagePath, getImageUrl }: { imagePath: string; getImageUrl: (path: string) => Promise<string | null> }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      const url = await getImageUrl(imagePath);
+      setImageUrl(url);
+      setLoading(false);
+    };
+    loadImage();
+  }, [imagePath, getImageUrl]);
+
+  if (loading) {
+    return <div className="text-sm">Carregando imagem...</div>;
+  }
+
+  if (!imageUrl) {
+    return null;
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt="Flashcard answer"
+      className="max-w-full max-h-48 rounded border mt-2"
+    />
   );
 }

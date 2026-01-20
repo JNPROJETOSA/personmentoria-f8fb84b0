@@ -1,16 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { NotebookData, MedicalArea } from '@/lib/types';
+import { MedicalArea } from '@/lib/types';
+
+export interface NotebookEntry {
+  id: string;
+  user_id: string;
+  specialty: MedicalArea;
+  folder_id: string | null;
+  name: string;
+  content: string;
+  created_at?: string;
+  updated_at: string;
+}
 
 export function useNotebook(userId: string | undefined) {
-  const [notebookData, setNotebookData] = useState<NotebookData>({
-    [MedicalArea.PEDIATRIA]: '',
-    [MedicalArea.GO]: '',
-    [MedicalArea.PREVENTIVA]: '',
-    [MedicalArea.CLINICA]: '',
-    [MedicalArea.CIRURGIA]: ''
-  });
+  const [notebooks, setNotebooks] = useState<NotebookEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) {
@@ -18,58 +31,103 @@ export function useNotebook(userId: string | undefined) {
       return;
     }
 
-    const fetchNotebook = async () => {
+    const fetchNotebooks = async () => {
       const { data, error } = await supabase
         .from('notebook_entries')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (!isMountedRef.current) return;
 
       if (error) {
-        console.error('Error fetching notebook:', error);
+        console.error('Error fetching notebooks:', error);
       } else {
-        const notebook: NotebookData = {
-          [MedicalArea.PEDIATRIA]: '',
-          [MedicalArea.GO]: '',
-          [MedicalArea.PREVENTIVA]: '',
-          [MedicalArea.CLINICA]: '',
-          [MedicalArea.CIRURGIA]: ''
-        };
-
-        data.forEach(entry => {
-          notebook[entry.specialty as MedicalArea] = entry.content || '';
-        });
-
-        setNotebookData(notebook);
+        setNotebooks(data as NotebookEntry[]);
       }
       setLoading(false);
     };
 
-    fetchNotebook();
+    fetchNotebooks();
   }, [userId]);
 
-  const updateNotebook = async (area: MedicalArea, content: string) => {
+  const addNotebook = async (
+    folderId: string | null,
+    name: string,
+    area: MedicalArea,
+    content: string = ''
+  ): Promise<NotebookEntry | null> => {
+    if (!userId) return null;
+
+    const { data, error } = await supabase
+      .from('notebook_entries')
+      .insert({
+        user_id: userId,
+        folder_id: folderId,
+        name,
+        specialty: area,
+        content
+      })
+      .select()
+      .single();
+
+    if (!isMountedRef.current) return null;
+
+    if (error) {
+      console.error('Error adding notebook:', error);
+      return null;
+    } else {
+      setNotebooks(prev => [data as NotebookEntry, ...prev]);
+      return data as NotebookEntry;
+    }
+  };
+
+  const updateNotebook = async (
+    id: string,
+    updates: { name?: string; content?: string }
+  ): Promise<void> => {
     if (!userId) return;
 
-    // Upsert: insert or update
+    const dbUpdates: any = { updated_at: new Date().toISOString() };
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.content !== undefined) dbUpdates.content = updates.content;
+
     const { error } = await supabase
       .from('notebook_entries')
-      .upsert({
-        user_id: userId,
-        specialty: area,
-        content: content
-      }, {
-        onConflict: 'user_id,specialty'
-      });
+      .update(dbUpdates)
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (!isMountedRef.current) return;
 
     if (error) {
       console.error('Error updating notebook:', error);
     } else {
-      setNotebookData(prev => ({
-        ...prev,
-        [area]: content
-      }));
+      setNotebooks(prev => prev.map(n =>
+        n.id === id
+          ? { ...n, ...updates, updated_at: new Date().toISOString() }
+          : n
+      ));
     }
   };
 
-  return { notebookData, loading, updateNotebook };
+  const deleteNotebook = async (id: string): Promise<void> => {
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('notebook_entries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (!isMountedRef.current) return;
+
+    if (error) {
+      console.error('Error deleting notebook:', error);
+    } else {
+      setNotebooks(prev => prev.filter(n => n.id !== id));
+    }
+  };
+
+  return { notebooks, loading, addNotebook, updateNotebook, deleteNotebook };
 }

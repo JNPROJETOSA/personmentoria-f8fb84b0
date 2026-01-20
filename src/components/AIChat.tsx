@@ -12,11 +12,15 @@ import ReactMarkdown from 'react-markdown';
 import { useChatHistory, Message } from '@/hooks/useChatHistory';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 interface AIChatProps {
   exercises: ExerciseLog[];
   classes: ClassItem[];
 }
+
+// Initialize Gemini API
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GOOGLE_API_KEY);
 
 export default function AIChat({ exercises, classes }: AIChatProps) {
   const {
@@ -31,7 +35,8 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // Mobile toggle
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -47,112 +52,103 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
   const handleSend = async () => {
     if (!input.trim() || isLoading || !currentSession) return;
 
+    // 1. Prepare user message
     const userMessage: Message = { role: 'user', content: input };
-    const updatedMessages = [...currentSession.messages, userMessage];
+    const messagesToProcess = [...currentSession.messages, userMessage];
 
     // Optimistic update
-    updateCurrentChat(updatedMessages);
+    updateCurrentChat(messagesToProcess);
     setInput('');
     setIsLoading(true);
 
     try {
-      // Prepare user data context
-      const userData = {
-        exercises,
-        classes,
-        profile,
+      // 3. Configure Model with System Instruction
+      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error("Chave da API não encontrada (VITE_GOOGLE_API_KEY). Tente reiniciar o servidor (npm run dev).");
+      }
+
+      // 2. Prepare Context Stats
+      const contextStats = {
+        name: profile?.name || 'Estudante',
+        level: profile?.level || 1,
+        xp: profile?.xp || 0,
+        completedClasses: classes.filter(c => c.studied).length,
+        totalClasses: classes.length,
+        exercisesDone: exercises.length,
+        correctness: exercises.length > 0
+          ? Math.round((exercises.reduce((acc, curr) => acc + curr.correctAnswers, 0) / exercises.reduce((acc, curr) => acc + curr.totalQuestions, 0)) * 100)
+          : 0
       };
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-tutor`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            messages: updatedMessages,
-            userData,
-          }),
-        }
-      );
+      // 3. Configure Model with System Instruction
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash", // Updated as per user request
+        systemInstruction: `Você é o Tutor Regis, um mentor de residência médica experiente, motivador e focado.
+        
+        DADOS DO ALUNO:
+        - Nome: ${contextStats.name}
+        - Nível: ${contextStats.level} (XP: ${contextStats.xp})
+        - Progresso Aulas: ${contextStats.completedClasses}/${contextStats.totalClasses}
+        - Questões Feitas: ${contextStats.exercisesDone}
+        - Desempenho Médio: ${contextStats.correctness}%
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limit excedido. Aguarde alguns instantes e tente novamente.');
-        }
-        if (response.status === 402) {
-          throw new Error('Créditos insuficientes. Adicione créditos ao workspace.');
-        }
-        throw new Error('Erro ao comunicar com TUTOR REGIS');
+        SUAS DIRETRIZES:
+        1. Responda de forma concisa, direta e útil.
+        2. Use emojis para manter o tom leve 🎓🩺.
+        3. Se o aluno perguntar sobre cronograma, baseie-se no progresso dele.
+        4. Se perguntar dúvida técnica de medicina, explique com clareza e autoridade.
+        5. Sempre motive o aluno a continuar estudando.
+        `
+      });
+
+      // 4. Convert History to Gemini Format
+      // Gemini requires history to start with 'user'. We skip the initial greeting if present.
+      let validHistoryMsgs = currentSession.messages;
+      if (validHistoryMsgs.length > 0 && validHistoryMsgs[0].role === 'assistant') {
+        validHistoryMsgs = validHistoryMsgs.slice(1);
       }
 
-      if (!response.body) {
-        throw new Error('Resposta inválida do servidor');
-      }
+      const historyForGemini = validHistoryMsgs
+        .map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        }));
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantContent = '';
+      const chat = model.startChat({
+        history: historyForGemini,
+      });
 
-      // Create assistant message placeholder
-      const withAssistantPlaceholder = [...updatedMessages, { role: 'assistant', content: '' } as Message];
-      updateCurrentChat(withAssistantPlaceholder);
+      // 5. Stream Response
+      const result = await chat.sendMessageStream(input);
 
-      let textBuffer = '';
-      let streamDone = false;
+      let assistantContent = "";
+      const messagesWithAssistant = [...messagesToProcess, { role: 'assistant', content: '' } as Message];
+      updateCurrentChat(messagesWithAssistant);
 
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        assistantContent += chunkText;
 
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') {
-            streamDone = true;
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              // Real-time update to specific session
-              updateCurrentChat([
-                ...updatedMessages,
-                { role: 'assistant', content: assistantContent }
-              ]);
-            }
-          } catch {
-            textBuffer = line + '\n' + textBuffer;
-            break;
-          }
-        }
+        updateCurrentChat([
+          ...messagesToProcess,
+          { role: 'assistant', content: assistantContent }
+        ]);
       }
 
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Gemini Error:', error);
+
+      let errorMessage = "Erro desconhecido.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       toast({
-        title: 'Erro ao conversar com TUTOR REGIS',
-        description: error instanceof Error ? error.message : 'Tente novamente em alguns instantes.',
+        title: 'Erro no Tutor Regis',
+        description: errorMessage,
         variant: 'destructive',
       });
-
-      // Remove empty assistant message if error occurred
-      updateCurrentChat(updatedMessages);
-
     } finally {
       setIsLoading(false);
     }
@@ -165,9 +161,16 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
     }
   };
 
+  const quickPrompts = [
+    { label: "📊 Análise Geral", text: "Analise meu desempenho geral e sugira áreas para focar" },
+    { label: "🎯 Revisão", text: "Quais tópicos devo revisar com base nas minhas notas?" },
+    { label: "🧠 Memorização", text: "Me explique técnicas de memorização para residência" },
+    { label: "📅 Cronograma", text: "Como organizar meu cronograma de estudos?" }
+  ];
+
   return (
     <div className="flex h-[calc(100vh-6rem)] gap-4 animate-in fade-in duration-500">
-      {/* History Sidebar - Desktop: Always visible, Mobile: Toggleable */}
+      {/* History Sidebar */}
       <Card className={`flex-col w-80 shrink-0 ${isHistoryOpen ? 'flex absolute z-20 h-full left-0 top-0 shadow-2xl' : 'hidden md:flex'}`}>
         <CardHeader className="pb-3 border-b">
           <div className="flex items-center justify-between">
@@ -194,11 +197,11 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
                   key={session.id}
                   onClick={() => {
                     setCurrentSessionId(session.id);
-                    setIsHistoryOpen(false); // Close on mobile selection
+                    setIsHistoryOpen(false);
                   }}
                   className={`flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors group ${currentSessionId === session.id
-                      ? 'bg-primary/10 hover:bg-primary/15'
-                      : 'hover:bg-muted'
+                    ? 'bg-primary/10 hover:bg-primary/15'
+                    : 'hover:bg-muted'
                     }`}
                 >
                   <div className="flex flex-col flex-1 min-w-0 mr-2">
@@ -245,7 +248,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
             <div className="min-w-0 flex-1">
               <CardTitle className="text-lg truncate">TUTOR REGIS</CardTitle>
               <CardDescription className="truncate hidden sm:block">
-                Assistente inteligente com IA especializado em residência médica
+                Assistente de Residência Médica
               </CardDescription>
             </div>
             <Button size="sm" variant="outline" className="shrink-0 md:hidden" onClick={createNewChat}>
@@ -264,8 +267,8 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
                 >
                   <div
                     className={`max-w-[85%] sm:max-w-[80%] rounded-lg p-4 ${message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted'
                       }`}
                   >
                     {message.role === 'assistant' && (
@@ -290,55 +293,34 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
                   <div className="max-w-[80%] rounded-lg p-4 bg-muted">
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Analisando seus dados...</span>
+                      <span className="text-sm">Pensando...</span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {currentSession?.messages.length === 1 && (
+              {!currentSession?.messages.length || currentSession?.messages.length <= 1 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-8 px-2 md:px-8">
-                  <Button
-                    variant="outline"
-                    className="justify-start text-left h-auto py-3 whitespace-normal"
-                    onClick={() => setInput('Analise meu desempenho geral e sugira áreas para focar')}
-                    disabled={isLoading}
-                  >
-                    📊 Análise do meu desempenho
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start text-left h-auto py-3 whitespace-normal"
-                    onClick={() => setInput('Quais tópicos devo revisar com base nas minhas notas?')}
-                    disabled={isLoading}
-                  >
-                    🎯 Sugestões de revisão
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start text-left h-auto py-3 whitespace-normal"
-                    onClick={() => setInput('Me explique técnicas de memorização para residência médica')}
-                    disabled={isLoading}
-                  >
-                    🧠 Técnicas de estudo
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start text-left h-auto py-3 whitespace-normal"
-                    onClick={() => setInput('Como organizar meu cronograma de estudos?')}
-                    disabled={isLoading}
-                  >
-                    📅 Organização de estudos
-                  </Button>
+                  {quickPrompts.map((prompt, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      className="justify-start text-left h-auto py-3 whitespace-normal"
+                      onClick={() => setInput(prompt.text)}
+                      disabled={isLoading}
+                    >
+                      {prompt.label}
+                    </Button>
+                  ))}
                 </div>
-              )}
+              ) : null}
             </div>
           </ScrollArea>
 
           <div className="p-4 border-t bg-background mt-auto">
             <div className="flex gap-2 max-w-4xl mx-auto w-full">
               <Textarea
-                placeholder="Digite sua pergunta..."
+                placeholder="Digite sua pergunta pro Regis..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}

@@ -188,6 +188,58 @@ function MindMapEditorContent({ initialMap, onSave, onBack }: MindMapEditorProps
         });
     };
 
+    const handleExportPDF = async () => {
+        if (!reactFlowWrapper.current) return;
+
+        try {
+            toast({
+                title: "Gerando PDF...",
+                description: "Aguarde enquanto preparamos o documento.",
+            });
+
+            // Capture the flow
+            const canvas = await html2canvas(reactFlowWrapper.current, {
+                ignoreElements: (element) => {
+                    const className = element.className;
+                    if (typeof className === 'string') {
+                        return className.includes('react-flow__controls') || className.includes('react-flow__panel') || className.includes('react-flow__minimap');
+                    }
+                    return false;
+                }
+            });
+            const imgData = canvas.toDataURL('image/png');
+
+            const { PdfService } = await import('@/lib/pdf-service');
+            const pdf = new PdfService();
+            await pdf.initialize('Mapa Mental');
+
+            pdf.addSubtitle(`${title} • Gerado em ${new Date().toLocaleDateString('pt-BR')}`);
+
+            // Calculate dimensions to fit image on page
+            const imgProps = pdf.getDoc().getImageProperties(imgData);
+            const pdfWidth = pdf.getContentWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            // Add image
+            // Note: raw addImage usage via getDoc() until PdfService wraps it
+            pdf.getDoc().addImage(imgData, 'PNG', pdf.getMargin(), pdf.getCurrentY(), pdfWidth, pdfHeight);
+
+            pdf.save(`mapa-mental-${title.toLowerCase().replace(/\s/g, '-')}`);
+
+            toast({
+                title: "PDF Exportado!",
+                description: "O arquivo foi baixado com sucesso.",
+            });
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            toast({
+                title: "Erro ao exportar",
+                description: "Não foi possível gerar o PDF.",
+                variant: "destructive"
+            });
+        }
+    };
+
     // Selection handling
     const onSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
         if (nodes.length > 0) {
@@ -215,6 +267,10 @@ function MindMapEditorContent({ initialMap, onSave, onBack }: MindMapEditorProps
                     />
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={handleExportPDF}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Exportar PDF
+                    </Button>
                     <Button onClick={handleSave}>
                         <Save className="w-4 h-4 mr-2" />
                         Salvar

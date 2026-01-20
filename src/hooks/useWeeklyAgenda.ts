@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfWeek, format } from 'date-fns';
+import { startOfWeek, format, addWeeks } from 'date-fns';
 
 export interface DayAgenda {
   id?: string;
@@ -14,20 +14,21 @@ export interface WeeklyAgendaData {
   days: DayAgenda[];
 }
 
-export function useWeeklyAgenda(userId?: string) {
+export function useWeeklyAgenda(userId?: string, weekOffset: number = 0) {
   const [agenda, setAgenda] = useState<WeeklyAgendaData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const getWeekStart = useCallback(() => {
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Sunday
+    const weekStart = startOfWeek(addWeeks(now, weekOffset), { weekStartsOn: 0 }); // Sunday
     return format(weekStart, 'yyyy-MM-dd');
-  }, []);
+  }, [weekOffset]);
 
   const fetchAgenda = useCallback(async () => {
     try {
+      setLoading(true);
       const weekStart = getWeekStart();
-      
+
       let targetUserId = userId;
       if (!targetUserId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -68,7 +69,7 @@ export function useWeeklyAgenda(userId?: string) {
   const updateDayTasks = useCallback(async (dayOfWeek: number, tasks: string[], completedIndices?: number[]) => {
     try {
       const weekStart = getWeekStart();
-      
+
       let targetUserId = userId;
       if (!targetUserId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -101,9 +102,9 @@ export function useWeeklyAgenda(userId?: string) {
       // Update local state
       setAgenda(prev => {
         if (!prev) return prev;
-        const newDays = prev.days.map(d => 
-          d.dayOfWeek === dayOfWeek 
-            ? { ...d, tasks, completedIndices: completedIndices ?? d.completedIndices } 
+        const newDays = prev.days.map(d =>
+          d.dayOfWeek === dayOfWeek
+            ? { ...d, tasks, completedIndices: completedIndices ?? d.completedIndices }
             : d
         );
         return { ...prev, days: newDays };
@@ -115,17 +116,17 @@ export function useWeeklyAgenda(userId?: string) {
 
   const toggleTaskCompletion = useCallback(async (dayOfWeek: number, taskIndex: number) => {
     if (!agenda) return;
-    
+
     const dayAgenda = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
     if (!dayAgenda) return;
-    
+
     const currentCompleted = dayAgenda.completedIndices || [];
     const isCompleted = currentCompleted.includes(taskIndex);
-    
+
     const newCompleted = isCompleted
       ? currentCompleted.filter(i => i !== taskIndex)
       : [...currentCompleted, taskIndex];
-    
+
     await updateDayTasks(dayOfWeek, dayAgenda.tasks, newCompleted);
   }, [agenda, updateDayTasks]);
 

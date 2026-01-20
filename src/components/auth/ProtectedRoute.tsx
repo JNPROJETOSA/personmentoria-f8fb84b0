@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
-    allowedRoles?: ('admin' | 'student')[];
+    allowedRoles?: ('admin' | 'student' | 'mentor')[];
 }
 
 export const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
@@ -23,7 +23,7 @@ export const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     }
 
     // If roles are specified, check if user has permission
-    if (allowedRoles && profile && !allowedRoles.includes(profile.role as 'admin' | 'student')) {
+    if (allowedRoles && profile && !allowedRoles.includes(profile.role as 'admin' | 'student' | 'mentor')) {
         // Redirect students trying to access admin routes back to dashboard
         return <Navigate to="/" replace />;
     }

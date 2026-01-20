@@ -279,75 +279,108 @@ export default function Editorial({
     }
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const currentEditorialName = editorials.find(e => e.id === selectedEditorialId)?.name || 'Edital';
+  const handleExportPDF = async () => {
+    try {
+      const { PdfService } = await import('@/lib/pdf-service');
+      const pdf = new PdfService();
+      const currentEditorialName = editorials.find(e => e.id === selectedEditorialId)?.name || 'Edital';
+      const progress = calculateProgress();
 
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(33, 33, 33);
-    doc.text(currentEditorialName, 14, 20);
+      await pdf.initialize('Relatório de Progresso Acadêmico');
+      pdf.addSubtitle(`${currentEditorialName} • Gerado em: ${new Date().toLocaleDateString('pt-BR')}`);
 
-    doc.setFontSize(14);
-    doc.setTextColor(66, 66, 66);
-    doc.text(`Relatório de Progresso Acadêmico`, 14, 30);
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 36);
+      // --- Progress Card ---
+      const startY = pdf.getCurrentY();
+      const margin = pdf.getMargin();
+      const contentWidth = pdf.getContentWidth();
 
-    // Progress
-    const progress = calculateProgress();
-    doc.setFontSize(12);
-    doc.setTextColor(33, 33, 33);
-    doc.text(`Progresso Geral do Edital: ${progress.toFixed(1)}%`, 14, 46);
+      pdf.drawCard(margin, startY, contentWidth, 40, 'Progresso Geral do Edital');
 
-    // Table Data
-    const tableData: any[] = [];
+      // Determine color based on progress
+      let progressColor: [number, number, number] = [60, 60, 60];
+      if (progress >= 80) progressColor = [16, 185, 129]; // Emerald
+      else if (progress >= 50) progressColor = [245, 158, 11]; // Amber
+      else progressColor = [239, 68, 68]; // Red
 
-    editorialData.areas.forEach(area => {
-      // Add Area Header Row
-      const areaProgress = calculateAreaProgress({ areaId: area.id });
-      tableData.push([{ content: `${area.name.toUpperCase()} - ${areaProgress.toFixed(0)}% Concluído`, colSpan: 2, styles: { fillColor: [240, 240, 240], fontStyle: 'bold', textColor: [0, 0, 0] } }]);
+      pdf.addTextAt(margin + (contentWidth / 2), startY + 25, `${progress.toFixed(1)}%`, 24, {
+        align: 'center',
+        bold: true,
+        color: progressColor
+      });
 
-      area.subareas.forEach(subarea => {
-        subarea.topics.forEach(topic => {
-          const status = topic.status === TopicStatus.THEORY_SEEN ? 'VISTO' : 'NÃO VISTO';
-          tableData.push([
-            `${subarea.name}: ${topic.name}`,
-            status
-          ]);
+      pdf.moveY(55);
+
+      // --- Detailed Table ---
+      const tableData: any[] = [];
+
+      editorialData.areas.forEach(area => {
+        // Area Header Row (Custom)
+        const areaProgress = calculateAreaProgress({ areaId: area.id });
+
+        // We push a special row for the area
+        // Note: PdfService addTable is simple, but we can use autoTable features via options
+        // We will flatten it: [Area Name, ''] then [Topic, Status]
+
+        // However, to make it look like the previous section row, we might need a custom hook or just plain rows styled differently.
+        // Let's use the 'didParseCell' or 'didDrawCell' to style Area rows if we mark them.
+
+        // Strategy: Add area as a row with a special prefix or metadata
+        tableData.push([`>>>AREA<<<${area.name.toUpperCase()} (${areaProgress.toFixed(0)}%)`, '']);
+
+        area.subareas.forEach(subarea => {
+          subarea.topics.forEach(topic => {
+            const status = topic.status === TopicStatus.THEORY_SEEN ? 'VISTO' : 'NÃO VISTO';
+            tableData.push([
+              `${subarea.name}: ${topic.name}`,
+              status
+            ]);
+          });
         });
       });
-    });
 
-    autoTable(doc, {
-      startY: 55,
-      head: [['Tópico', 'Status']],
-      body: tableData,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [22, 163, 74], textColor: 255 }, // Emerald-600 color
-      columnStyles: {
-        0: { cellWidth: 120 },
-        1: { cellWidth: 40, halign: 'center' }
-      },
-      didParseCell: function (data) {
-        if (data.section === 'body' && data.column.index === 1) {
-          if (data.cell.text[0] === 'VISTO') {
-            data.cell.styles.textColor = [22, 163, 74]; // Green
-            data.cell.styles.fontStyle = 'bold';
-          } else {
-            data.cell.styles.textColor = [156, 163, 175]; // Gray
+      pdf.addTable(
+        ['Tópico', 'Status'],
+        tableData,
+        {
+          columnStyles: {
+            0: { cellWidth: 'auto' },
+            1: { cellWidth: 40, halign: 'center' }
+          },
+          didParseCell: (data: any) => {
+            // Style Area Rows
+            if (data.section === 'body' && data.row.raw[0].toString().startsWith('>>>AREA<<<')) {
+              // It's a header row
+              data.cell.styles.fillColor = [240, 240, 240];
+              data.cell.styles.fontStyle = 'bold';
+              data.cell.styles.textColor = [0, 0, 0];
+
+              if (data.column.index === 0) {
+                data.cell.colSpan = 2;
+                data.cell.text = [data.row.raw[0].toString().replace('>>>AREA<<<', '')];
+              }
+            }
+
+            // Style Status Cell
+            if (data.section === 'body' && data.column.index === 1 && !data.row.raw[0].toString().startsWith('>>>AREA<<<')) {
+              if (data.cell.text[0] === 'VISTO') {
+                data.cell.styles.textColor = [22, 163, 74];
+                data.cell.styles.fontStyle = 'bold';
+              } else {
+                data.cell.styles.textColor = [156, 163, 175];
+              }
+            }
           }
         }
-      }
-    });
+      );
 
-    // Using FileSaver.js for cross-browser compatibility
-    const filename = `progresso_edital_${new Date().toISOString().split('T')[0]}.pdf`;
-    const blob = doc.output('blob');
-    saveAs(blob, filename);
+      const filename = `progresso_edital_${new Date().toISOString().split('T')[0]}`;
+      pdf.save(filename);
 
-    toast({ title: "PDF Exportado", description: "O relatório de progresso foi baixado." });
+      toast({ title: "PDF Exportado", description: "O relatório de progresso foi baixado." });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Erro ao gerar PDF", variant: "destructive", description: "Ocorreu um erro." });
+    }
   };
 
   const globalProgress = calculateProgress();

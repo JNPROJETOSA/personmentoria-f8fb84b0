@@ -13,6 +13,7 @@ export interface Flashcard {
   area: MedicalArea;
   front: string;
   back: string;
+  answer_image_url?: string | null;
   folderId: string | null;
   difficulty: 'easy' | 'medium' | 'hard' | null;
   lastReviewed: string | null;
@@ -191,9 +192,32 @@ export interface ExamSession {
   strategy?: string;
   completed: boolean;
   actualDuration: number; // minutes
+  totalQuestions?: number;
+  correctAnswers?: number;
 }
 
 export interface ExamModeData {
   sessions: ExamSession[];
   mantra: string;
 }
+
+// PDF Repository Types
+export interface PDFFolder {
+  id: string;
+  name: string;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+}
+
+export interface PDFFile {
+  id: string;
+  folder_id: string;
+  name: string;
+  file_path: string;
+  file_size: number | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+}
+

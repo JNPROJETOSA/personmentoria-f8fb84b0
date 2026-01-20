@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 interface Profile {
     id: string;
     email: string;
-    role: 'admin' | 'student';
+    role: 'admin' | 'student' | 'mentor';
     full_name: string | null;
 }
 
@@ -17,6 +17,7 @@ interface AuthContextType {
     profile: Profile | null;
     loading: boolean;
     isAdmin: boolean;
+    isMentor: boolean;
     signOut: () => Promise<void>;
 }
 
@@ -26,8 +27,10 @@ const AuthContext = createContext<AuthContextType>({
     profile: null,
     loading: true,
     isAdmin: false,
+    isMentor: false,
     signOut: async () => { },
 });
+
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [session, setSession] = useState<Session | null>(null);
@@ -112,6 +115,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             profile,
             loading,
             isAdmin: profile?.role === 'admin',
+            isMentor: profile?.role === 'mentor',
             signOut
         }}>
             {children}

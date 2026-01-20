@@ -37,6 +37,7 @@ export function useFlashcards(userId: string | undefined) {
           area: f.area as any,
           front: f.front,
           back: f.back,
+          answer_image_url: (f as any).answer_image_url || null,
           folderId: f.folder_id || null,
           difficulty: null,
           lastReviewed: null,
@@ -61,6 +62,7 @@ export function useFlashcards(userId: string | undefined) {
         area: flashcard.area,
         front: flashcard.front,
         back: flashcard.back,
+        answer_image_url: flashcard.answer_image_url || null,
         folder_id: flashcard.folderId || null
       })
       .select()
@@ -76,6 +78,7 @@ export function useFlashcards(userId: string | undefined) {
         area: data.area as any,
         front: data.front,
         back: data.back,
+        answer_image_url: (data as any).answer_image_url || null,
         folderId: data.folder_id || null,
         difficulty: null,
         lastReviewed: null,
@@ -87,6 +90,23 @@ export function useFlashcards(userId: string | undefined) {
 
   const deleteFlashcard = async (id: string) => {
     if (!userId) return;
+
+    // Find the flashcard to be deleted
+    const flashcardToDelete = flashcards.find(f => f.id === id);
+
+    // If it has an image in our bucket, delete it from storage first
+    if (flashcardToDelete && flashcardToDelete.answer_image_url) {
+      // Only delete if it's hosted in our storage (simple check, or rely on storage.remove error handling)
+      if (!flashcardToDelete.answer_image_url.startsWith('http')) {
+        const { error: storageError } = await supabase.storage
+          .from('flashcard-images')
+          .remove([flashcardToDelete.answer_image_url]);
+
+        if (storageError) {
+          console.error('Error deleting flashcard image file:', storageError);
+        }
+      }
+    }
 
     const { error } = await supabase
       .from('flashcards')
@@ -103,13 +123,14 @@ export function useFlashcards(userId: string | undefined) {
     }
   };
 
-  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string; folderId?: string | null }) => {
+  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string; answer_image_url?: string | null; folderId?: string | null }) => {
     if (!userId) return;
 
     const dbUpdates: any = {};
     if (updates.area !== undefined) dbUpdates.area = updates.area;
     if (updates.front !== undefined) dbUpdates.front = updates.front;
     if (updates.back !== undefined) dbUpdates.back = updates.back;
+    if (updates.answer_image_url !== undefined) dbUpdates.answer_image_url = updates.answer_image_url;
     if (updates.folderId !== undefined) dbUpdates.folder_id = updates.folderId;
 
     const { error } = await supabase
@@ -123,15 +144,16 @@ export function useFlashcards(userId: string | undefined) {
     if (error) {
       console.error('Error updating flashcard:', error);
     } else {
-      setFlashcards(prev => prev.map(f => 
-        f.id === id 
-          ? { 
-              ...f, 
-              area: (updates.area || f.area) as any,
-              front: updates.front !== undefined ? updates.front : f.front,
-              back: updates.back !== undefined ? updates.back : f.back,
-              folderId: updates.folderId !== undefined ? updates.folderId : f.folderId
-            }
+      setFlashcards(prev => prev.map(f =>
+        f.id === id
+          ? {
+            ...f,
+            area: (updates.area || f.area) as any,
+            front: updates.front !== undefined ? updates.front : f.front,
+            back: updates.back !== undefined ? updates.back : f.back,
+            answer_image_url: updates.answer_image_url !== undefined ? updates.answer_image_url : f.answer_image_url,
+            folderId: updates.folderId !== undefined ? updates.folderId : f.folderId
+          }
           : f
       ));
     }

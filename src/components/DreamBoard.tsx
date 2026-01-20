@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Image as ImageIcon, StickyNote, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Image as ImageIcon, StickyNote, Trash2, ExternalLink, UploadCloud } from 'lucide-react';
+import { useDreamBoardImages } from '@/hooks/useDreamBoardImages';
+import DreamBoardImage from './DreamBoardImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DreamBoardItem } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
@@ -13,13 +16,29 @@ import { toast } from '@/hooks/use-toast';
 interface DreamBoardProps {
   items: DreamBoardItem[];
   addItem: (item: Omit<DreamBoardItem, 'id'>) => Promise<void>;
-  deleteItem: (id: string) => Promise<void>;
+  deleteItem: (id: string) => Promise<boolean>;
 }
 
 export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardProps) {
   const isMountedRef = useRef(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const { uploadImage, getImageUrl, deleteImage, uploading } = useDreamBoardImages();
   const [newImage, setNewImage] = useState({ url: '', title: '' });
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   const [newNote, setNewNote] = useState({
     content: '',
     title: '',
@@ -36,11 +55,19 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
   }, []);
 
   const handleAddImage = async () => {
-    if (!newImage.url.trim()) {
+    let finalUrl = newImage.url;
+
+    if (newImageFile) {
+      const uploadedPath = await uploadImage(newImageFile);
+      if (!uploadedPath) return; // Hook handles error toast
+      finalUrl = uploadedPath;
+    }
+
+    if (!finalUrl.trim()) {
       if (isMountedRef.current) {
         toast({
-          title: "URL obrigatória",
-          description: "Insira a URL da imagem",
+          title: "Imagem obrigatória",
+          description: "Faça upload de uma imagem ou insira uma URL",
           variant: "destructive"
         });
       }
@@ -49,7 +76,7 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
 
     await addItem({
       type: 'image',
-      content: newImage.url,
+      content: finalUrl,
       title: newImage.title || 'Imagem',
       createdAt: new Date().toISOString()
     });
@@ -57,6 +84,8 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
     if (!isMountedRef.current) return;
 
     setNewImage({ url: '', title: '' });
+    setNewImageFile(null);
+    setNewImagePreview(null);
     setIsAdding(false);
     toast({ title: "Imagem adicionada ao mural!" });
   };
@@ -91,10 +120,21 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
     toast({ title: "Nota adicionada ao mural!" });
   };
 
-  const handleDelete = async (id: string) => {
-    await deleteItem(id);
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const success = await deleteItem(deleteId);
+    setDeleteId(null);
+
     if (isMountedRef.current) {
-      toast({ title: "Item removido" });
+      if (success) {
+        toast({ title: "Item removido" });
+      } else {
+        toast({
+          title: "Erro ao remover",
+          description: "Não foi possível apagar o item. Tente novamente.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -137,14 +177,74 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
 
                   <TabsContent value="image" className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="image-url">URL da Imagem</Label>
-                      <Input
-                        id="image-url"
-                        placeholder="https://exemplo.com/imagem.jpg"
-                        value={newImage.url}
-                        onChange={(e) => setNewImage({ ...newImage, url: e.target.value })}
-                      />
+                      <Label>Imagem</Label>
+
+                      {/* Image Preview Area */}
+                      {(newImagePreview || newImage.url) && (
+                        <div className="relative mb-2 aspect-video bg-muted rounded-md overflow-hidden border">
+                          <img
+                            src={newImagePreview || newImage.url}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              setNewImage({ ...newImage, url: '' });
+                              setNewImagePreview(null);
+                              setNewImageFile(null);
+                            }}
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Upload Input */}
+                      {!newImagePreview && !newImage.url && (
+                        <div className="space-y-4">
+                          <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="image-upload" className="cursor-pointer border-2 border-dashed rounded-lg p-6 hover:bg-muted/50 transition-colors text-center block">
+                              <div className="flex flex-col items-center gap-2">
+                                <UploadCloud className="w-8 h-8 text-muted-foreground" />
+                                <span className="text-sm font-medium">Clique para fazer upload</span>
+                                <span className="text-xs text-muted-foreground">Max 200KB (JPG, PNG, WebP)</span>
+                              </div>
+                              <Input
+                                id="image-upload"
+                                type="file"
+                                className="hidden"
+                                accept="image/jpeg,image/png,image/webp"
+                                onChange={handleImageFileChange}
+                                disabled={uploading}
+                              />
+                            </Label>
+                          </div>
+
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-background px-2 text-muted-foreground">Ou use uma URL</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="image-url">URL da Imagem</Label>
+                            <Input
+                              id="image-url"
+                              placeholder="https://exemplo.com/imagem.jpg"
+                              value={newImage.url}
+                              onChange={(e) => setNewImage({ ...newImage, url: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="image-title">Título (opcional)</Label>
                       <Input
@@ -154,12 +254,21 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                         onChange={(e) => setNewImage({ ...newImage, title: e.target.value })}
                       />
                     </div>
-                    <Button onClick={handleAddImage} className="w-full">
-                      Adicionar Imagem
+                    <Button
+                      onClick={handleAddImage}
+                      className="w-full"
+                      disabled={uploading || (!newImage.url && !newImageFile)}
+                    >
+                      {uploading ? (
+                        <>Wait...</>
+                      ) : (
+                        "Adicionar Imagem"
+                      )}
                     </Button>
                   </TabsContent>
 
-                  <div className="space-y-4">
+                  {/* Note Content (Unchanged) */}
+                  <TabsContent value="note" className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="note-title">Título (opcional)</Label>
                       <Input
@@ -260,7 +369,7 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                     <Button onClick={handleAddNote} className="w-full">
                       Adicionar Post-it
                     </Button>
-                  </div>
+                  </TabsContent>
                 </Tabs>
               </DialogContent>
             </Dialog>
@@ -279,16 +388,21 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                 <Card key={item.id} className="relative group overflow-hidden">
                   {item.type === 'image' ? (
                     <div className="aspect-video relative">
-                      <img
-                        src={item.content}
+                      <DreamBoardImage
+                        imagePath={item.content}
                         alt={item.title || 'Imagem do mural'}
+                        getImageUrl={getImageUrl}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute top-2 right-2 flex gap-2">
                         <a
-                          href={item.content}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href="#"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            // Fetch URL if it's a path
+                            const url = await getImageUrl(item.content);
+                            if (url) window.open(url, '_blank');
+                          }}
                           className="p-2 bg-background/80 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -297,7 +411,7 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                           variant="destructive"
                           size="icon"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => setDeleteId(item.id)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -317,8 +431,8 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
-                        onClick={() => handleDelete(item.id)}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10 z-10" // Added z-10
+                        onClick={() => setDeleteId(item.id)}
                       >
                         <Trash2 className="w-4 h-4 text-gray-700" />
                       </Button>
@@ -347,6 +461,23 @@ export default function DreamBoard({ items, addItem, deleteItem }: DreamBoardPro
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja apagar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. O item será removido permanentemente do seu mural.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

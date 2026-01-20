@@ -7,13 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Trash2, Shield, ShieldCheck } from 'lucide-react';
+import { Loader2, Plus, Trash2, Shield, ShieldCheck, UserCheck } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface WhitelistedUser {
     email: string;
-    role: 'admin' | 'student';
+    role: 'admin' | 'student' | 'mentor';
     created_at: string;
 }
 
@@ -21,7 +21,7 @@ export const AdminUserManagement = () => {
     const [users, setUsers] = useState<WhitelistedUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [newEmail, setNewEmail] = useState('');
-    const [newRole, setNewRole] = useState<'admin' | 'student'>('student');
+    const [newRole, setNewRole] = useState<'admin' | 'student' | 'mentor'>('student');
     const [inviteLoading, setInviteLoading] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth(); // Current admin user
@@ -118,7 +118,7 @@ export const AdminUserManagement = () => {
                 <Card className="md:col-span-1 border-primary/20 h-fit">
                     <CardHeader>
                         <CardTitle>Adicionar Novo Usuário</CardTitle>
-                        <CardDescription>Libere o acesso para um novo aluno ou administrador.</CardDescription>
+                        <CardDescription>Libere o acesso para um novo aluno, mentor ou administrador.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleInvite} className="space-y-4">
@@ -134,12 +134,13 @@ export const AdminUserManagement = () => {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Função</label>
-                                <Select value={newRole} onValueChange={(v: 'admin' | 'student') => setNewRole(v)}>
+                                <Select value={newRole} onValueChange={(v: 'admin' | 'student' | 'mentor') => setNewRole(v)}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="student">Aluno</SelectItem>
+                                        <SelectItem value="mentor">Mentor</SelectItem>
                                         <SelectItem value="admin">Administrador</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -183,9 +184,9 @@ export const AdminUserManagement = () => {
                                             <TableRow key={user.email}>
                                                 <TableCell className="font-medium">{user.email}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="flex w-fit gap-1 items-center">
-                                                        {user.role === 'admin' ? <ShieldCheck className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
-                                                        {user.role === 'admin' ? 'Administrador' : 'Aluno'}
+                                                    <Badge variant={user.role === 'admin' ? 'default' : user.role === 'mentor' ? 'outline' : 'secondary'} className="flex w-fit gap-1 items-center">
+                                                        {user.role === 'admin' ? <ShieldCheck className="w-3 h-3" /> : user.role === 'mentor' ? <UserCheck className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                                                        {user.role === 'admin' ? 'Administrador' : user.role === 'mentor' ? 'Mentor' : 'Aluno'}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-muted-foreground text-sm">

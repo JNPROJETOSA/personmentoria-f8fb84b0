@@ -39,7 +39,7 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
   const [isPostSessionOpen, setIsPostSessionOpen] = useState(false);
   const [isDiaryOpen, setIsDiaryOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  
+
   // Config state
   const [totalTime, setTotalTime] = useState(180); // 3 hours default
   const [phases, setPhases] = useState<ExamPhase[]>([
@@ -51,18 +51,20 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
   const [soundAlerts, setSoundAlerts] = useState(true);
   const [resistanceMode, setResistanceMode] = useState(false);
   const [strategyNotes, setStrategyNotes] = useState('');
-  
+
   // Session state
   const [currentSession, setCurrentSession] = useState<ExamSession | null>(null);
   const [distractions, setDistractions] = useState<DistractionMark[]>([]);
-  
+
   // Post-session state
   const [anxiety, setAnxiety] = useState(3);
   const [focus, setFocus] = useState(3);
   const [mentalFatigue, setMentalFatigue] = useState(3);
   const [overallFeeling, setOverallFeeling] = useState('');
   const [diary, setDiary] = useState('');
-  
+  const [totalQuestions, setTotalQuestions] = useState<number | ''>('');
+  const [correctAnswers, setCorrectAnswers] = useState<number | ''>('');
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -71,7 +73,7 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
       timerRef.current = setInterval(() => {
         setElapsedSeconds(prev => {
           const next = prev + 1;
-          
+
           // Check phase transitions
           if (currentSession && phases.length > 0) {
             let accumulated = 0;
@@ -88,14 +90,14 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
               }
             }
           }
-          
+
           // Check final time
           const totalSeconds = totalTime * 60;
           if (next >= totalSeconds) {
             handleStopSession();
             return totalSeconds;
           }
-          
+
           // 30-minute warning
           if (next === totalSeconds - 1800 && soundAlerts) {
             toast({
@@ -103,7 +105,7 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
               description: "Continue focado. Você está indo bem.",
             });
           }
-          
+
           // 10-minute warning
           if (next === totalSeconds - 600 && soundAlerts) {
             toast({
@@ -112,12 +114,12 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
               variant: "destructive"
             });
           }
-          
+
           return next;
         });
       }, 1000);
     }
-    
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -128,14 +130,14 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
     const context = new (window.AudioContext || (window as any).webkitAudioContext)();
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
-    
+
     oscillator.connect(gainNode);
     gainNode.connect(context.destination);
-    
+
     oscillator.frequency.value = 800;
     oscillator.type = 'sine';
     gainNode.gain.value = 0.3;
-    
+
     oscillator.start(context.currentTime);
     oscillator.stop(context.currentTime + 0.2);
   };
@@ -150,7 +152,7 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
       resistanceMode,
       mantra: examModeData.mantra
     };
-    
+
     const session: ExamSession = {
       id: `session-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -160,14 +162,14 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
       actualDuration: 0,
       strategy: strategyNotes || undefined
     };
-    
+
     setCurrentSession(session);
     setDistractions([]);
     setElapsedSeconds(0);
     setCurrentPhaseIndex(0);
     setIsRunning(true);
     setIsConfigOpen(false);
-    
+
     toast({
       title: "Sessão Iniciada",
       description: examModeData.mantra || "Agora é só você e o tempo. Boa prova!",
@@ -184,26 +186,26 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
 
   const handleStopSession = () => {
     if (!currentSession) return;
-    
+
     setIsRunning(false);
     setIsPaused(false);
-    
+
     const completedSession: ExamSession = {
       ...currentSession,
       distractions,
       completed: true,
       actualDuration: Math.floor(elapsedSeconds / 60)
     };
-    
+
     setCurrentSession(completedSession);
     setIsPostSessionOpen(true);
-    
+
     confetti({
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 }
     });
-    
+
     if (soundAlerts) playAlert();
   };
 
@@ -221,27 +223,29 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
 
   const savePostSession = async () => {
     if (!currentSession) return;
-    
+
     const emotions: PostSessionEmotions = {
       anxiety,
       focus,
       mentalFatigue,
       overallFeeling: overallFeeling.trim()
     };
-    
+
     const finalSession: Omit<ExamSession, 'id'> = {
       ...currentSession,
       emotions,
-      diary: diary.trim() || undefined
+      diary: diary.trim() || undefined,
+      totalQuestions: Number(totalQuestions) || undefined,
+      correctAnswers: Number(correctAnswers) || undefined
     };
-    
+
     await addExamSession(finalSession);
-    
+
     toast({
       title: "Sessão Salva",
       description: "Seu treino foi registrado com sucesso!"
     });
-    
+
     // Reset
     setCurrentSession(null);
     setIsPostSessionOpen(false);
@@ -250,6 +254,8 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
     setMentalFatigue(3);
     setOverallFeeling('');
     setDiary('');
+    setTotalQuestions('');
+    setCorrectAnswers('');
   };
 
   const addPhase = () => {
@@ -284,18 +290,18 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
 
   const getPhaseProgress = (): number => {
     if (phases.length === 0) return 0;
-    
+
     let accumulated = 0;
     for (let i = 0; i < currentPhaseIndex; i++) {
       accumulated += phases[i].duration * 60;
     }
-    
+
     const currentPhase = getCurrentPhase();
     if (!currentPhase) return 100;
-    
+
     const phaseElapsed = elapsedSeconds - accumulated;
     const phaseDuration = currentPhase.duration * 60;
-    
+
     return Math.min((phaseElapsed / phaseDuration) * 100, 100);
   };
 
@@ -305,7 +311,7 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
       const bucket = Math.floor(d.timestamp / 300); // 300 seconds = 5 minutes
       if (bucket < 12) buckets[bucket]++;
     });
-    
+
     return buckets.map((count, idx) => ({
       time: `${idx * 5}-${(idx + 1) * 5}min`,
       count
@@ -314,13 +320,13 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
 
   const getFocusInsights = () => {
     if (examModeData.sessions.length < 3) return null;
-    
+
     const recentSessions = examModeData.sessions.slice(0, 10);
     const avgDistractions = recentSessions.reduce((sum, s) => sum + s.distractions.length, 0) / recentSessions.length;
     const avgFocus = recentSessions
       .filter(s => s.emotions)
       .reduce((sum, s) => sum + (s.emotions?.focus || 0), 0) / recentSessions.filter(s => s.emotions).length;
-    
+
     return {
       avgDistractions: avgDistractions.toFixed(1),
       avgFocus: avgFocus.toFixed(1),
@@ -406,7 +412,7 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
               </div>
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm">
-                  {getFocusInsights()?.trend === 'improving' 
+                  {getFocusInsights()?.trend === 'improving'
                     ? "✨ Você está mais concentrado do que antes. Continue assim!"
                     : "💪 Mantenha a consistência. Seu foco está estável."}
                 </p>
@@ -611,6 +617,18 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
                           <p className="text-muted-foreground">{session.diary}</p>
                         </div>
                       )}
+
+                      {(session.totalQuestions !== undefined && session.totalQuestions > 0) && (
+                        <div className="p-3 bg-muted/50 rounded-lg text-sm flex justify-between items-center">
+                          <span className="font-medium">Desempenho:</span>
+                          <div className="flex gap-4 items-center">
+                            <span>🎯 {session.correctAnswers}/{session.totalQuestions}</span>
+                            <Badge variant={((session.correctAnswers || 0) / session.totalQuestions) * 100 >= 80 ? 'default' : 'secondary'}>
+                              {(((session.correctAnswers || 0) / session.totalQuestions) * 100).toFixed(0)}%
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))
@@ -626,11 +644,10 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
   return (
     <div className="space-y-6">
       {/* Main Timer */}
-      <Card className={`border-l-4 transition-all ${
-        isLastTen ? 'border-l-red-500 animate-pulse' : 
-        isLastThirty ? 'border-l-amber-500' : 
-        'border-l-primary'
-      }`}>
+      <Card className={`border-l-4 transition-all ${isLastTen ? 'border-l-red-500 animate-pulse' :
+        isLastThirty ? 'border-l-amber-500' :
+          'border-l-primary'
+        }`}>
         <CardContent className="pt-6">
           <div className="text-center space-y-6">
             {/* Current Phase */}
@@ -645,11 +662,10 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
 
             {/* Main Clock */}
             <div className="relative">
-              <div className={`text-7xl md:text-8xl font-mono font-bold ${
-                isLastTen ? 'text-red-500' : 
-                isLastThirty ? 'text-amber-500' : 
-                'text-primary'
-              }`}>
+              <div className={`text-7xl md:text-8xl font-mono font-bold ${isLastTen ? 'text-red-500' :
+                isLastThirty ? 'text-amber-500' :
+                  'text-primary'
+                }`}>
                 {formatTime(totalSeconds - elapsedSeconds)}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
@@ -660,12 +676,11 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
             {/* Progress Bar */}
             <div className="space-y-2">
               <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all ${
-                    isLastTen ? 'bg-red-500' : 
-                    isLastThirty ? 'bg-amber-500' : 
-                    'bg-primary'
-                  }`}
+                <div
+                  className={`h-full transition-all ${isLastTen ? 'bg-red-500' :
+                    isLastThirty ? 'bg-amber-500' :
+                      'bg-primary'
+                    }`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -700,16 +715,16 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
               <div className="border-t pt-4">
                 <p className="text-sm text-muted-foreground mb-3">Monitoramento de Foco</p>
                 <div className="flex gap-2 justify-center flex-wrap">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => markDistraction('distraction')}
                   >
                     <AlertCircle className="w-4 h-4 mr-1" />
                     Distração ({distractions.filter(d => d.type === 'distraction').length})
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => markDistraction('mental-pause')}
                   >
@@ -751,6 +766,31 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Quantitative Data */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Total de Questões</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Ex: 50"
+                  value={totalQuestions}
+                  onChange={(e) => setTotalQuestions(e.target.value ? Number(e.target.value) : '')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Acertos</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max={Number(totalQuestions)}
+                  placeholder="Ex: 40"
+                  value={correctAnswers}
+                  onChange={(e) => setCorrectAnswers(e.target.value ? Number(e.target.value) : '')}
+                />
+              </div>
+            </div>
+
             {/* Anxiety */}
             <div className="space-y-2">
               <Label>Nível de Ansiedade ({anxiety}/5)</Label>
@@ -817,8 +857,8 @@ const ExamMode = ({ data, addSession: addExamSession, updateMantra }: ExamModePr
               <Button onClick={savePostSession} className="flex-1">
                 Salvar Sessão
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsDiaryOpen(true)}
                 className="flex-1"
               >

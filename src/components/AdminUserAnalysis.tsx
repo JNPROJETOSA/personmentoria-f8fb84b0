@@ -283,164 +283,93 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
   ];
 
   // Generate PDF Report
-  const generatePDF = () => {
+  const generatePDF = async () => {
     try {
-      const pdf = new jsPDF();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+      const { PdfService } = await import('@/lib/pdf-service');
+      const pdf = new PdfService();
 
-      const perryTeal: [number, number, number] = [13, 148, 136];
-      const indigoHeader: [number, number, number] = [79, 70, 229];
-      const slateHeader: [number, number, number] = [51, 65, 85];
-      const royalBlueHeader: [number, number, number] = [37, 99, 235];
-      const emeraldHeader: [number, number, number] = [16, 185, 129];
+      await pdf.initialize('Mentoria Regisdência - Relatório de Desempenho');
 
-      const addFooter = () => {
-        const pageCount = (pdf as any).internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-          pdf.setPage(i);
-          pdf.setFontSize(8);
-          pdf.setTextColor(150, 150, 150);
-          pdf.text(
-            `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
-            pageWidth / 2,
-            pageHeight - 10,
-            { align: 'center' }
-          );
-        }
-      };
+      // Subtitle with Student Name and Period
+      pdf.addSubtitle(`Aluno: ${user.name} • Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`);
 
-      // Header
-      pdf.setFillColor(perryTeal[0], perryTeal[1], perryTeal[2]);
-      pdf.rect(0, 0, pageWidth, 30, 'F');
+      // Add extra info line manually
+      pdf.addTextAt(pdf.getContentWidth() / 2 + pdf.getMargin(), 50, `(Aulas Estudadas: ${classesStudied})`, 10, { align: 'center', color: [100, 100, 100] });
+      pdf.moveY(10); // Adjust for the extra line
 
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(255, 255, 255);
-      pdf.text('Mentoria Regisdência - Relatório de Desempenho', pageWidth / 2, 12, { align: 'center' });
+      // --- KPI Grid ---
+      const startY = pdf.getCurrentY();
+      const margin = pdf.getMargin();
+      const contentWidth = pdf.getContentWidth();
+      const gap = 5;
+      const cardWidth = (contentWidth - (gap * 4)) / 5;
 
-      pdf.setFontSize(14);
-      pdf.text(`Aluno: ${user.name}`, pageWidth / 2, 21, { align: 'center' });
+      // KPI 1: Questões
+      pdf.drawCard(margin, startY, cardWidth, 35, 'Questões');
+      pdf.addMetricAt(margin + (cardWidth / 2), startY + 15, '', totalQuestions.toString(), 'center');
 
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(240, 240, 240);
-      pdf.text(
-        `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`,
-        pageWidth / 2,
-        24, // Adjusted Y position
-        { align: 'center' }
-      );
-      pdf.text(
-        `(Aulas Estudadas: ${classesStudied})`, // Added to PDF header
-        pageWidth / 2,
-        28,
-        { align: 'center' }
-      );
+      // KPI 2: Acertos
+      pdf.drawCard(margin + cardWidth + gap, startY, cardWidth, 35, 'Acertos');
+      pdf.addMetricAt(margin + cardWidth + gap + (cardWidth / 2), startY + 15, '', totalCorrect.toString(), 'center');
 
-      let yPosition = 40;
+      // KPI 3: Aproveitamento
+      pdf.drawCard(margin + (cardWidth * 2) + (gap * 2), startY, cardWidth, 35, 'Nota (%)');
+      let accColor: [number, number, number] = [60, 60, 60];
+      if (overallAccuracy >= 80) accColor = [16, 185, 129];
+      else if (overallAccuracy >= 60) accColor = [245, 158, 11];
+      else accColor = [239, 68, 68];
 
-      // Summary Card
-      pdf.setFillColor(245, 247, 250);
-      pdf.roundedRect(14, yPosition, pageWidth - 28, 40, 3, 3, 'F');
-      pdf.setDrawColor(220, 220, 220);
-      pdf.setLineWidth(0.5);
-      pdf.roundedRect(14, yPosition, pageWidth - 28, 40, 3, 3, 'S');
+      pdf.addTextAt(margin + (cardWidth * 2) + (gap * 2) + (cardWidth / 2), startY + 20, `${overallAccuracy.toFixed(1)}%`, 14, {
+        align: 'center',
+        bold: true,
+        color: accColor
+      });
 
-      const kpiX = 20;
-      const kpiSpacing = 35; // Reduced spacing to fit 5 items
+      // KPI 4: Temas
+      pdf.drawCard(margin + (cardWidth * 3) + (gap * 3), startY, cardWidth, 35, 'Temas');
+      pdf.addMetricAt(margin + (cardWidth * 3) + (gap * 3) + (cardWidth / 2), startY + 15, '', uniqueTopics.toString(), 'center');
 
-      // KPIs
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(100, 100, 100);
+      // KPI 5: Aulas
+      pdf.drawCard(margin + (cardWidth * 4) + (gap * 4), startY, cardWidth, 35, 'Aulas');
+      pdf.addMetricAt(margin + (cardWidth * 4) + (gap * 4) + (cardWidth / 2), startY + 15, '', classesStudied.toString(), 'center');
 
-      pdf.text('QUESTÕES', kpiX, yPosition + 10);
-      pdf.setFontSize(16);
-      pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
-      pdf.text(totalQuestions.toString(), kpiX, yPosition + 22);
+      pdf.moveY(45);
 
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('ACERTOS', kpiX + kpiSpacing, yPosition + 10);
-      pdf.setFontSize(16);
-      pdf.setTextColor(16, 185, 129);
-      pdf.text(totalCorrect.toString(), kpiX + kpiSpacing, yPosition + 22);
+      // Gamification Info
+      // Use addTextAt for center alignment
+      pdf.addTextAt(margin + (contentWidth / 2), pdf.getCurrentY(), `Nível: ${user.level}  |  XP: ${user.xp}  |  Sequência: ${user.streak} dias`, 10, { align: 'center', color: [100, 100, 100] });
+      pdf.moveY(10);
 
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('APROVEITAMENTO', kpiX + kpiSpacing * 2, yPosition + 10);
-      pdf.setFontSize(16);
-      if (overallAccuracy >= 80) pdf.setTextColor(16, 185, 129);
-      else if (overallAccuracy >= 60) pdf.setTextColor(245, 158, 11);
-      else pdf.setTextColor(239, 68, 68);
-      pdf.text(`${overallAccuracy.toFixed(1)}%`, kpiX + kpiSpacing * 2, yPosition + 22);
-
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('TEMAS', kpiX + kpiSpacing * 3, yPosition + 10);
-      pdf.setFontSize(16);
-      pdf.setTextColor(perryTeal[0], perryTeal[1], perryTeal[2]);
-      pdf.text(uniqueTopics.toString(), kpiX + kpiSpacing * 3, yPosition + 22);
-
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text('AULAS', kpiX + kpiSpacing * 4, yPosition + 10);
-      pdf.setFontSize(16);
-      pdf.setTextColor(royalBlueHeader[0], royalBlueHeader[1], royalBlueHeader[2]);
-      pdf.text(classesStudied.toString(), kpiX + kpiSpacing * 4, yPosition + 22);
-
-
-      // Gamification stats
-      pdf.setFontSize(9);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`Nível: ${user.level}  |  XP: ${user.xp}  |  Sequência: ${user.streak} dias`, kpiX, yPosition + 35);
-
-      yPosition += 50;
-
-      // Performance by Area Table
+      // --- Performance by Area ---
       if (areaStats.length > 0) {
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Área Médica', 'Questões', 'Acertos', 'Erros', 'Aproveitamento']],
-          body: areaStats.map(stat => [
+        pdf.addSection('Desempenho por Grande Área');
+        pdf.addTable(
+          ['Área Médica', 'Questões', 'Acertos', 'Erros', 'Aproveitamento'],
+          areaStats.map(stat => [
             stat.area,
             stat.total.toString(),
             stat.correct.toString(),
             stat.errors.toString(),
             `${stat.accuracy.toFixed(1)}%`
           ]),
-          theme: 'striped',
-          headStyles: {
-            fillColor: indigoHeader,
-            textColor: 255,
-            fontSize: 10,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: { fontSize: 9, cellPadding: 4 },
-          columnStyles: {
-            0: { halign: 'left', fontStyle: 'bold' },
-            1: { halign: 'center' },
-            2: { halign: 'center' },
-            3: { halign: 'center' },
-            4: { halign: 'center', fontStyle: 'bold' }
+          {
+            columnStyles: {
+              0: { halign: 'left', fontStyle: 'bold' },
+              1: { halign: 'center' },
+              2: { halign: 'center' },
+              3: { halign: 'center' },
+              4: { halign: 'center', fontStyle: 'bold' }
+            }
           }
-        });
-        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        );
       }
 
-      // Topic Performance Table
+      // --- Topic Performance ---
       if (topicData.length > 0) {
-        if (yPosition > pageHeight - 60) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['#', 'Tema', 'Área', 'Questões', 'Acertos', 'Nota (%)']],
-          body: topicData.slice(0, 30).map((t: any, idx: number) => [
+        pdf.addSection('Desempenho Detalhado por Tema (Top 30)');
+        pdf.addTable(
+          ['#', 'Tema', 'Área', 'Questões', 'Acertos', 'Nota (%)'],
+          topicData.slice(0, 30).map((t: any, idx: number) => [
             (idx + 1).toString(),
             t.topic,
             t.area,
@@ -448,157 +377,99 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
             t.correct.toString(),
             `${t.accuracy}%`
           ]),
-          theme: 'striped',
-          headStyles: {
-            fillColor: royalBlueHeader,
-            textColor: 255,
-            fontSize: 10,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: { fontSize: 8, cellPadding: 3 },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 10 },
-            1: { halign: 'left' },
-            2: { halign: 'left', cellWidth: 35 },
-            3: { halign: 'center', cellWidth: 20 },
-            4: { halign: 'center', cellWidth: 18 },
-            5: { halign: 'center', fontStyle: 'bold', cellWidth: 20 }
+          {
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 15 },
+              1: { halign: 'left' },
+              2: { halign: 'left', cellWidth: 40 },
+              3: { halign: 'center' },
+              4: { halign: 'center' },
+              5: { halign: 'center', fontStyle: 'bold' }
+            },
+            didDrawCell: (data: any) => {
+              if (data.column.index === 5 && data.section === 'body') {
+                const val = parseFloat(data.cell.raw.replace('%', ''));
+                if (val >= 80) data.cell.styles.textColor = [16, 185, 129];
+                else if (val >= 50) data.cell.styles.textColor = [245, 158, 11];
+                else data.cell.styles.textColor = [239, 68, 68];
+              }
+            }
           }
-        });
-        yPosition = (pdf as any).lastAutoTable.finalY + 10;
+        );
       }
 
-      // Exams Table with detailed breakdown
+      // --- Exams ---
       if (filteredExams.length > 0) {
-        if (yPosition > pageHeight - 60) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        pdf.addSection('Provas e Simulados Realizados');
 
-        // Section title
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(slateHeader[0], slateHeader[1], slateHeader[2]);
-        pdf.text('PROVAS E SIMULADOS REALIZADOS', 14, yPosition);
-        yPosition += 8;
-
-        // Loop through each exam and show details
         for (const exam of filteredExams) {
-          if (yPosition > pageHeight - 80) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-
           const perf = exam.performance as any || {};
           const totalQ = perf.totalQuestions || 0;
           const totalC = perf.correctAnswers || 0;
           const areaDetails = perf.areaDetails || [];
           const acc = totalQ > 0 ? ((totalC / totalQ) * 100).toFixed(1) : '0';
 
-          // Exam header card
-          pdf.setFillColor(248, 250, 252);
-          pdf.roundedRect(14, yPosition, pageWidth - 28, 18, 2, 2, 'F');
-          pdf.setDrawColor(200, 200, 200);
-          pdf.roundedRect(14, yPosition, pageWidth - 28, 18, 2, 2, 'S');
+          // Ensure space for exam block (approx 40 height)
+          pdf.ensureSpace(40);
 
-          pdf.setFontSize(11);
-          pdf.setFont('helvetica', 'bold');
-          pdf.setTextColor(30, 41, 59);
-          pdf.text(exam.name, 18, yPosition + 7);
+          const startY = pdf.getCurrentY();
 
-          pdf.setFontSize(9);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setTextColor(100, 116, 139);
-          pdf.text(`${exam.institution} • ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 18, yPosition + 14);
+          pdf.addText(`${exam.name}`, 12, [30, 41, 59], { bold: true });
+          pdf.addText(`${exam.institution} • ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 10, [100, 116, 139]);
 
-          // Score on the right
-          pdf.setFontSize(12);
-          pdf.setFont('helvetica', 'bold');
-          const accNum = parseFloat(acc);
-          if (accNum >= 70) pdf.setTextColor(16, 185, 129);
-          else if (accNum >= 50) pdf.setTextColor(245, 158, 11);
-          else pdf.setTextColor(239, 68, 68);
-          pdf.text(`${totalC}/${totalQ} (${acc}%)`, pageWidth - 18, yPosition + 10, { align: 'right' });
+          // Right aligned score (manual calculation of X)
+          const scoreText = `${totalC}/${totalQ} (${acc}%)`;
+          const pageWidth = pdf.getDoc().internal.pageSize.getWidth();
+          pdf.addTextAt(pageWidth - margin - 20, startY + 5, scoreText, 12, { bold: true, align: 'right', color: parseFloat(acc) >= 70 ? [16, 185, 129] : [239, 68, 68] });
 
-          yPosition += 22;
+          pdf.moveY(5);
 
-          // Area details table for this exam
           if (areaDetails.length > 0) {
-            autoTable(pdf, {
-              startY: yPosition,
-              head: [['Área Médica', 'Acertos', 'Total', 'Aproveitamento']],
-              body: areaDetails.map((ad: any) => {
-                const areaAcc = ad.total > 0 ? ((ad.correct / ad.total) * 100).toFixed(1) : '0';
-                return [
-                  ad.area,
-                  ad.correct.toString(),
-                  ad.total.toString(),
-                  `${areaAcc}%`
-                ];
-              }),
-              theme: 'striped',
-              headStyles: {
-                fillColor: [100, 116, 139],
-                textColor: 255,
-                fontSize: 9,
-                fontStyle: 'bold',
-                halign: 'center'
-              },
-              styles: { fontSize: 8, cellPadding: 3 },
-              columnStyles: {
-                0: { halign: 'left', fontStyle: 'bold', cellWidth: 60 },
-                1: { halign: 'center', cellWidth: 25 },
-                2: { halign: 'center', cellWidth: 25 },
-                3: { halign: 'center', fontStyle: 'bold', cellWidth: 30 }
-              },
-              margin: { left: 14, right: 14 }
-            });
-            yPosition = (pdf as any).lastAutoTable.finalY + 10;
+            pdf.addTable(
+              ['Área Médica', 'Acertos', 'Total', 'Aproveitamento'],
+              areaDetails.map((ad: any) => [
+                ad.area,
+                ad.correct.toString(),
+                ad.total.toString(),
+                `${(ad.total > 0 ? ((ad.correct / ad.total) * 100).toFixed(1) : '0')}%`
+              ]),
+              {
+                theme: 'grid', // Cleaner for nested tables
+                headStyles: { fillColor: [100, 116, 139], fontSize: 9 },
+                styles: { fontSize: 8 },
+                margin: { left: margin + 5, right: margin + 5 } // Indent table
+              }
+            );
+            pdf.moveY(5);
           } else {
-            yPosition += 5;
+            pdf.moveY(5);
           }
         }
       }
 
-      // Classes Table
-      if (filteredClasses.filter(c => c.studied).length > 0) {
-        if (yPosition > pageHeight - 60) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-
-        autoTable(pdf, {
-          startY: yPosition,
-          head: [['Data', 'Especialidade', 'Aula']],
-          body: filteredClasses.filter(c => c.studied).map(cls => [
+      // --- Classes ---
+      const studiedClassesList = filteredClasses.filter(c => c.studied);
+      if (studiedClassesList.length > 0) {
+        pdf.addSection('Aulas Teóricas Concluídas');
+        pdf.addTable(
+          ['Data', 'Especialidade', 'Aula'],
+          studiedClassesList.map(cls => [
             new Date(cls.date).toLocaleDateString('pt-BR'),
             cls.specialty,
             cls.title
           ]),
-          theme: 'striped',
-          headStyles: {
-            fillColor: emeraldHeader,
-            textColor: 255,
-            fontSize: 10,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          styles: { fontSize: 9, cellPadding: 4 },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 25 },
-            1: { halign: 'left', cellWidth: 45 },
-            2: { halign: 'left' }
+          {
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 30 },
+              1: { halign: 'left', cellWidth: 50 },
+              2: { halign: 'left' }
+            }
           }
-        });
+        );
       }
 
-      addFooter();
-
-      // Using FileSaver.js for cross-browser compatibility
-      const fileName = `PERRYMED_${user.name.replace(/\s+/g, '_')}_${startDate}_a_${endDate}.pdf`;
-      const blob = pdf.output('blob');
-      saveAs(blob, fileName);
+      const fileName = `PERRYMED_${user.name.replace(/\s+/g, '_')}_${startDate}_a_${endDate}`;
+      pdf.save(fileName);
 
       toast({
         title: "Relatório gerado!",
@@ -608,7 +479,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       console.error('Error generating PDF:', error);
       toast({
         title: "Erro ao gerar PDF",
-        description: "Não foi possível gerar o relatório.",
+        description: `Não foi possível gerar o relatório. Erro: ${error}`,
         variant: "destructive"
       });
     }
@@ -641,6 +512,47 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           )}
         </div>
       </div>
+
+      {/* Profile Details Card */}
+      <Card className="bg-muted/30 border-dashed">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Ano da Prova
+              </span>
+              <p className="font-semibold text-lg">{user.exam_year || 'Não definido'}</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Especialidade Alvo
+              </span>
+              <p className="font-semibold text-lg">{user.target_specialty || 'Não definida'}</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                Instituições Alvo
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {user.target_institutions && user.target_institutions.length > 0 ? (
+                  user.target_institutions.map((inst, idx) => (
+                    <Badge key={idx} variant="secondary" className="px-2 py-0.5">
+                      {inst}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-muted-foreground italic">Nenhuma definida</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Date Filter & Export */}
       <Card>

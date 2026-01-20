@@ -42,30 +42,37 @@ export default function Login() {
             }
         } catch (error: any) {
             console.error('Auth error:', error);
-            let message = "Ocorreu um erro inesperado.";
+            let message = error.message;
 
             if (error.message.includes('Email not authorized')) {
-                message = "Este email não tem permissão para acessar o sistema. Contate um administrador.";
+                message = "Este email não está na lista de convidados (Whitelist).";
             } else if (error.message.includes('Invalid login credentials')) {
                 message = "Email ou senha incorretos.";
+            } else if (error.message.includes('User already registered')) {
+                message = "Este email já possui cadastro. Tente fazer LOGIN em vez de Cadastrar.";
             }
 
             toast({
                 title: "Erro de autenticação",
-                description: message,
-                variant: "destructive"
+                description: `Detalhe: ${message}`, // Showing full detail
+                variant: "destructive",
+                duration: 6000
             });
         } finally {
             setLoading(false);
         }
     };
 
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <Card className="w-full max-w-md border-primary/20 shadow-lg">
                 <CardHeader className="space-y-1 text-center">
+                    <div className="flex justify-center mb-4">
+                        <img src="/login-logo.png?v=2" alt="Logo Mentoria Regisdência" className="w-24 h-24 rounded-full object-cover shadow-lg" />
+                    </div>
                     <CardTitle className="text-2xl font-bold tracking-tight text-primary">
-                        Mentoria Residência
+                        Mentoria Regisdência
                     </CardTitle>
                     <CardDescription>
                         {isSignUp ? "Crie sua conta para começar" : "Entre para acessar sua plataforma de estudos"}
@@ -81,7 +88,7 @@ export default function Login() {
                                     placeholder="Seu email"
                                     className="pl-9"
                                     value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    onChange={(e) => setEmail(e.target.value.toLowerCase())}
                                     required
                                 />
                             </div>

@@ -147,54 +147,92 @@ export default function Analysis({ exercises }: AnalysisProps) {
     { name: 'Erros', value: totalQuestions - totalCorrect, color: 'hsl(var(--destructive))' }
   ];
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     try {
-      const doc = new jsPDF();
+      const { PdfService } = await import('@/lib/pdf-service');
+      const pdf = new PdfService();
       const areaName = selectedArea === 'all' ? 'Todas as Áreas' : selectedArea;
 
-      doc.setFontSize(20);
-      doc.text(`Relatório - ${areaName}`, 20, 20);
+      await pdf.initialize('Análise Geral de Desempenho');
+      pdf.addSubtitle(`${areaName} • Gerado em: ${new Date().toLocaleDateString('pt-BR')}`);
 
-      doc.setFontSize(12);
-      let yPos = 40;
+      // --- Executive Summary (Grid) ---
+      const startY = pdf.getCurrentY();
+      const margin = pdf.getMargin();
+      const contentWidth = pdf.getContentWidth();
+      const colGap = 10;
+      const colWidth = (contentWidth - (colGap * 3)) / 4;
 
-      // KPIs
-      doc.text('Indicadores Chave:', 20, yPos);
-      yPos += 10;
-      doc.text(`Total de Exercícios: ${totalExercises}`, 30, yPos);
-      yPos += 7;
-      doc.text(`Temas Únicos: ${uniqueTopics}`, 30, yPos);
-      yPos += 7;
-      doc.text(`Total de Questões: ${totalQuestions}`, 30, yPos);
-      yPos += 7;
-      doc.text(`Taxa de Acerto: ${overallAccuracy.toFixed(1)}%`, 30, yPos);
-      yPos += 15;
+      // Card 1: Total Questões
+      pdf.drawCard(margin, startY, colWidth, 40, 'Questões');
+      pdf.addMetricAt(margin + (colWidth / 2), startY + 15, '', totalQuestions.toString(), 'center');
 
-      // Topics table
-      doc.text('Desempenho por Tema:', 20, yPos);
-      yPos += 10;
+      // Card 2: Temas
+      pdf.drawCard(margin + colWidth + colGap, startY, colWidth, 40, 'Temas Únicos');
+      pdf.addMetricAt(margin + colWidth + colGap + (colWidth / 2), startY + 15, '', uniqueTopics.toString(), 'center');
 
-      topicData.forEach((topic, index) => {
-        if (yPos > 270) {
-          doc.addPage();
-          yPos = 20;
-        }
-        doc.text(`${index + 1}. ${topic.topic}`, 30, yPos);
-        yPos += 7;
-        doc.text(`   Acurácia: ${topic.acurácia}% | Questões: ${topic.questões} | Última: ${topic.ultimaPratica}`, 30, yPos);
-        yPos += 10;
+      // Card 3: Acertos
+      pdf.drawCard(margin + (colWidth * 2) + (colGap * 2), startY, colWidth, 40, 'Acertos');
+      pdf.addMetricAt(margin + (colWidth * 2) + (colGap * 2) + (colWidth / 2), startY + 15, '', totalCorrect.toString(), 'center');
+
+      // Card 4: Taxa de Acerto
+      pdf.drawCard(margin + (colWidth * 3) + (colGap * 3), startY, colWidth, 40, 'Aproveitamento');
+      // Determine color
+      let accColor: [number, number, number] = [60, 60, 60];
+      if (overallAccuracy >= 80) accColor = [16, 185, 129];
+      else if (overallAccuracy >= 60) accColor = [245, 158, 11];
+      else accColor = [239, 68, 68];
+
+      pdf.addTextAt(margin + (colWidth * 3) + (colGap * 3) + (colWidth / 2), startY + 20, `${overallAccuracy.toFixed(1)}%`, 14, {
+        align: 'center',
+        bold: true,
+        color: accColor
       });
 
-      // Using FileSaver.js for cross-browser compatibility
-      const filename = `relatorio-${areaName.toLowerCase().replace(/\s/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-      const blob = doc.output('blob');
-      saveAs(blob, filename);
+      pdf.moveY(55);
+
+      // --- Topics Table ---
+      pdf.addSection('Desempenho Detalhado por Tema');
+
+      pdf.addTable(
+        ['Tema', 'Acurácia', 'Questões', 'Acertos', 'Erros', 'Última Prática'],
+        topicData.map(topic => [
+          topic.topic,
+          `${topic.acurácia}%`,
+          topic.questões.toString(),
+          topic.acertos.toString(),
+          topic.erros.toString(),
+          topic.ultimaPratica
+        ]),
+        {
+          columnStyles: {
+            0: { halign: 'left' },
+            1: { halign: 'center', fontStyle: 'bold' },
+            2: { halign: 'center' },
+            3: { halign: 'center', textColor: [22, 163, 74] }, // Green
+            4: { halign: 'center', textColor: [220, 38, 38] }, // Red
+            5: { halign: 'center', cellWidth: 30 }
+          },
+          didDrawCell: (data: any) => {
+            if (data.column.index === 1 && data.section === 'body') {
+              const val = parseFloat(data.cell.raw.replace('%', ''));
+              if (val >= 80) data.cell.styles.textColor = [16, 185, 129];
+              else if (val >= 50) data.cell.styles.textColor = [245, 158, 11];
+              else data.cell.styles.textColor = [239, 68, 68];
+            }
+          }
+        }
+      );
+
+      const filename = `relatorio-${areaName.toLowerCase().replace(/\s/g, '-')}-${new Date().toISOString().split('T')[0]}`;
+      pdf.save(filename);
 
       toast({
         title: "PDF gerado!",
         description: "O relatório foi baixado com sucesso.",
       });
     } catch (error) {
+      console.error(error);
       toast({
         title: "Erro ao gerar PDF",
         description: "Ocorreu um erro ao criar o relatório.",

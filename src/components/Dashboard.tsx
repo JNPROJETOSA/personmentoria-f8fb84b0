@@ -17,6 +17,7 @@ interface DashboardProps {
   goals: Goals;
   setGoals: (goals: Goals) => void;
   userProgress: UserProgress;
+  userId: string | undefined;
 }
 
 function getLevelInfo(xp: number) {
@@ -39,7 +40,7 @@ function getLevelInfo(xp: number) {
   return { currentLevel, nextLevel, progressPercent, xpNeeded: nextLevel.minXP - xp };
 }
 
-export default function Dashboard({ exercises, classes, pendingReviews, goals, setGoals, userProgress }: DashboardProps) {
+export default function Dashboard({ exercises, classes, pendingReviews, goals, setGoals, userProgress, userId }: DashboardProps) {
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [tempGoals, setTempGoals] = useState(goals);
 
@@ -77,7 +78,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
   const heatmapData = useMemo(() => {
     const days: { date: string; count: number }[] = [];
     const today = new Date();
-    
+
     for (let i = 179; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
@@ -85,7 +86,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
       const count = exercises.filter(ex => ex.date === dateStr).reduce((sum, ex) => sum + ex.totalQuestions, 0);
       days.push({ date: dateStr, count });
     }
-    
+
     return days;
   }, [exercises]);
 
@@ -95,12 +96,12 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
   const dayActivity = useMemo(() => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const counts = Array(7).fill(0);
-    
+
     exercises.forEach(ex => {
       const day = new Date(ex.date).getDay();
       counts[day] += ex.totalQuestions;
     });
-    
+
     return days.map((name, i) => ({ name, count: counts[i] }));
   }, [exercises]);
 
@@ -138,10 +139,10 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
                   </div>
                 )}
               </div>
-              
+
               {/* Animated Progress Bar */}
               <div className="relative h-6 bg-muted rounded-full overflow-hidden border border-border">
-                <div 
+                <div
                   className="absolute inset-0 bg-gradient-to-r from-teal-500 via-blue-500 to-teal-500 transition-all duration-1000 ease-out animate-shimmer-bar"
                   style={{ width: `${Math.min(levelInfo.progressPercent, 100)}%` }}
                 >
@@ -165,7 +166,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
                   <div className="text-xs text-muted-foreground">dias</div>
                 </div>
               </div>
-              
+
               {/* Total Activities */}
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
                 <Trophy className="w-6 h-6 text-blue-500" />
@@ -227,7 +228,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               <span className="text-sm font-medium text-white/70">Questões por Semana</span>
               <Zap className="w-5 h-5 text-brand-accent" />
             </div>
-            
+
             {isEditingGoals ? (
               <Input
                 type="number"
@@ -249,7 +250,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             </div>
 
             <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="absolute inset-y-0 left-0 bg-brand-accent rounded-full transition-all duration-500"
                 style={{ width: `${Math.min((weeklyQuestions / goals.weeklyQuestions) * 100, 100)}%` }}
               />
@@ -262,7 +263,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               <span className="text-sm font-medium text-white/70">Taxa de Acerto Alvo</span>
               <Trophy className="w-5 h-5 text-green-400" />
             </div>
-            
+
             {isEditingGoals ? (
               <Input
                 type="number"
@@ -284,10 +285,9 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             </div>
 
             <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
-              <div 
-                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-                  weeklyAccuracy >= goals.targetAccuracy ? 'bg-brand-teal' : 'bg-yellow-500'
-                }`}
+              <div
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${weeklyAccuracy >= goals.targetAccuracy ? 'bg-brand-teal' : 'bg-yellow-500'
+                  }`}
                 style={{ width: `${Math.min(weeklyAccuracy, 100)}%` }}
               />
             </div>
@@ -299,7 +299,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               <span className="text-sm font-medium text-white/70">Tópicos Diferentes</span>
               <BrainCircuit className="w-5 h-5 text-purple-400" />
             </div>
-            
+
             {isEditingGoals ? (
               <Input
                 type="number"
@@ -321,7 +321,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             </div>
 
             <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="absolute inset-y-0 left-0 bg-purple-500 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min((uniqueTopics / goals.targetTopicsPerWeek) * 100, 100)}%` }}
               />
@@ -331,7 +331,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
       </div>
 
       {/* Weekly Agenda */}
-      <WeeklyAgenda />
+      <WeeklyAgenda userId={userId} />
 
       {/* Consistência de Estudos - Activity Garden */}
       <Card>
@@ -367,7 +367,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
                 );
               })}
             </div>
-            
+
             {/* Legend */}
             <div className="flex items-center gap-3 mt-6 text-xs text-muted-foreground">
               <span className="font-medium">Menos</span>
@@ -390,16 +390,15 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             <CardDescription>Progresso Global</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${
-              exercises.length > 0 
+            <div className={`text-3xl font-bold ${exercises.length > 0
                 ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 80
-                  ? 'text-performance-success' 
+                  ? 'text-performance-success'
                   : ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 60
-                  ? 'text-performance-warning'
-                  : 'text-performance-danger'
+                    ? 'text-performance-warning'
+                    : 'text-performance-danger'
                 : ''
-            }`}>
-              {exercises.length > 0 
+              }`}>
+              {exercises.length > 0
                 ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100).toFixed(1)
                 : 0}%
             </div>

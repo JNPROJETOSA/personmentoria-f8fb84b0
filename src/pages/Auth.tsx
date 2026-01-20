@@ -11,7 +11,7 @@ import { Brain, Mail, Lock, User, Key } from "lucide-react";
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const isResetMode = searchParams.get('reset') === 'true';
-  
+
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isResetPassword, setIsResetPassword] = useState(isResetMode);
@@ -58,7 +58,7 @@ export default function Auth() {
           title: "Senha alterada!",
           description: "Sua senha foi redefinida com sucesso.",
         });
-        
+
         setIsResetPassword(false);
         setIsLogin(true);
         navigate('/auth');
@@ -74,7 +74,7 @@ export default function Auth() {
           title: "Email enviado!",
           description: "Verifique sua caixa de entrada para redefinir sua senha.",
         });
-        
+
         setIsForgotPassword(false);
         setEmail('');
       } else if (isLogin) {
@@ -140,9 +140,7 @@ export default function Auth() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
-              <Brain className="w-8 h-8 text-white" />
-            </div>
+            <img src="/login-logo.png?v=2" alt="Logo Mentoria Regisdência" className="w-24 h-24 rounded-full object-cover shadow-lg" />
           </div>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-teal-500 bg-clip-text text-transparent">
             Mentoria Regisdência
@@ -151,10 +149,10 @@ export default function Auth() {
             {isResetPassword
               ? "Crie sua nova senha"
               : isForgotPassword
-              ? "Recuperar senha"
-              : isLogin
-              ? "Entre na sua conta para continuar estudando"
-              : "Crie sua conta e comece sua jornada"}
+                ? "Recuperar senha"
+                : isLogin
+                  ? "Entre na sua conta para continuar estudando"
+                  : "Crie sua conta e comece sua jornada"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -286,12 +284,12 @@ export default function Auth() {
               {loading
                 ? "Carregando..."
                 : isResetPassword
-                ? "Redefinir Senha"
-                : isForgotPassword
-                ? "Enviar Email de Recuperação"
-                : isLogin
-                ? "Entrar"
-                : "Cadastrar"}
+                  ? "Redefinir Senha"
+                  : isForgotPassword
+                    ? "Enviar Email de Recuperação"
+                    : isLogin
+                      ? "Entrar"
+                      : "Cadastrar"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

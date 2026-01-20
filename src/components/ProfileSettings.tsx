@@ -11,8 +11,16 @@ interface ProfileSettingsProps {
   profile: {
     name: string;
     user_id: string;
+    exam_year: string | null;
+    target_institutions: string[] | null;
+    target_specialty: string | null;
   } | null;
-  updateProfile: (updates: { name: string }) => void;
+  updateProfile: (updates: Partial<{
+    name: string;
+    exam_year: string | null;
+    target_institutions: string[] | null;
+    target_specialty: string | null;
+  }>) => void;
   userEmail: string | undefined;
 }
 
@@ -25,6 +33,10 @@ const nameSchema = z.string()
 export default function ProfileSettings({ profile, updateProfile, userEmail }: ProfileSettingsProps) {
   const isMountedRef = useRef(true);
   const [name, setName] = useState(profile?.name || '');
+  const [examYear, setExamYear] = useState(profile?.exam_year || '');
+  const [targetInstitutions, setTargetInstitutions] = useState<string[]>(profile?.target_institutions || []);
+  const [newInstitution, setNewInstitution] = useState('');
+  const [targetSpecialty, setTargetSpecialty] = useState(profile?.target_specialty || '');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string>('');
 
@@ -35,12 +47,28 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
   }, []);
 
   useEffect(() => {
-    if (profile?.name) {
-      setName(profile.name);
+    if (profile) {
+      setName(profile.name || '');
+      setExamYear(profile.exam_year || '');
+      setTargetInstitutions(profile.target_institutions || []);
+      setTargetSpecialty(profile.target_specialty || '');
     }
-  }, [profile?.name]);
+  }, [profile]);
 
-  const handleSave = () => {
+  const handleAddInstitution = () => {
+    if (newInstitution.trim()) {
+      if (!targetInstitutions.includes(newInstitution.trim())) {
+        setTargetInstitutions([...targetInstitutions, newInstitution.trim()]);
+      }
+      setNewInstitution('');
+    }
+  };
+
+  const handleRemoveInstitution = (inst: string) => {
+    setTargetInstitutions(targetInstitutions.filter(i => i !== inst));
+  };
+
+  const handleSave = async () => {
     setError('');
 
     // Validação
@@ -58,20 +86,38 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
       return;
     }
 
-    // Salvar
-    updateProfile({ name: validation.data });
-    setIsEditing(false);
+    try {
+      // Salvar
+      await updateProfile({
+        name: validation.data,
+        exam_year: examYear || null,
+        target_institutions: targetInstitutions.length > 0 ? targetInstitutions : null,
+        target_specialty: targetSpecialty || null
+      });
 
-    if (isMountedRef.current) {
+      setIsEditing(false);
+
+      if (isMountedRef.current) {
+        toast({
+          title: "Perfil atualizado!",
+          description: "Suas informações foram salvas com sucesso.",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update profile", err);
       toast({
-        title: "Perfil atualizado!",
-        description: "Suas informações foram salvas com sucesso.",
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar as alterações. Verifique sua conexão ou contate o suporte.",
+        variant: "destructive"
       });
     }
   };
 
   const handleCancel = () => {
     setName(profile?.name || '');
+    setExamYear(profile?.exam_year || '');
+    setTargetInstitutions(profile?.target_institutions || []);
+    setTargetSpecialty(profile?.target_specialty || '');
     setIsEditing(false);
     setError('');
   };
@@ -85,7 +131,7 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
             Informações Pessoais
           </CardTitle>
           <CardDescription>
-            Gerencie suas informações de perfil
+            Gerencie suas informações de perfil e objetivos
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -109,6 +155,93 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
             ) : (
               <div className="p-3 rounded-md bg-muted text-foreground">
                 {profile?.name || 'Nome não definido'}
+              </div>
+            )}
+          </div>
+
+          {/* Ano de Prova */}
+          <div className="space-y-2">
+            <Label htmlFor="examYear">Ano de Prestação da Prova</Label>
+            {isEditing ? (
+              <Input
+                id="examYear"
+                type="number"
+                value={examYear}
+                onChange={(e) => setExamYear(e.target.value)}
+                placeholder="Ex: 2026"
+                maxLength={4}
+              />
+            ) : (
+              <div className="p-3 rounded-md bg-muted text-foreground">
+                {profile?.exam_year || 'Não definido'}
+              </div>
+            )}
+          </div>
+
+          {/* Especialidade Pretendida */}
+          <div className="space-y-2">
+            <Label htmlFor="specialty">Especialidade Pretendida</Label>
+            {isEditing ? (
+              <Input
+                id="specialty"
+                value={targetSpecialty}
+                onChange={(e) => setTargetSpecialty(e.target.value)}
+                placeholder="Ex: Cardiologia, Pediatria..."
+              />
+            ) : (
+              <div className="p-3 rounded-md bg-muted text-foreground">
+                {profile?.target_specialty || 'Não definido'}
+              </div>
+            )}
+          </div>
+
+          {/* Instituições Alvo */}
+          <div className="space-y-2">
+            <Label>Instituições Pretendidas</Label>
+            {isEditing ? (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    value={newInstitution}
+                    onChange={(e) => setNewInstitution(e.target.value)}
+                    placeholder="Adicionar instituição (Ex: USP)"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddInstitution();
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={handleAddInstitution} variant="secondary">Adicionar</Button>
+                </div>
+
+                {targetInstitutions.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {targetInstitutions.map((inst, idx) => (
+                      <div key={idx} className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                        <span>{inst}</span>
+                        <button
+                          onClick={() => handleRemoveInstitution(inst)}
+                          className="hover:text-destructive focus:outline-none"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-3 rounded-md bg-muted text-foreground min-h-[46px] flex flex-wrap gap-2 items-center">
+                {profile?.target_institutions && profile.target_institutions.length > 0 ? (
+                  profile.target_institutions.map((inst, idx) => (
+                    <span key={idx} className="bg-background border px-2 py-0.5 rounded-md text-sm">
+                      {inst}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-muted-foreground">Nenhuma instituição definida</span>
+                )}
               </div>
             )}
           </div>

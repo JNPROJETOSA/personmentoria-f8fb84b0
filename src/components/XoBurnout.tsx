@@ -179,122 +179,113 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
     ];
   };
 
-  const generatePDF = () => {
-    const doc = new jsPDF();
+  const generatePDF = async () => {
     const filteredData = reportDays === 'all'
       ? burnoutData.checkIns
       : burnoutData.checkIns.slice(0, parseInt(reportDays));
 
-    // Header
-    doc.setFillColor(13, 148, 136);
-    doc.rect(0, 0, 210, 25, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.text('Mentoria Regisdência - Relatório de Bem-Estar', 105, 15, { align: 'center' });
+    // Initialize Service
+    const { PdfService } = await import('@/lib/pdf-service');
+    const pdf = new PdfService();
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
+    await pdf.initialize('Relatório de Bem-Estar');
+
+    // --- Header Metrics ---
     const periodText = reportDays === 'all'
-      ? `Período: Desde o início (${filteredData.length} check-ins)`
-      : `Período: Últimos ${reportDays} dias`;
-    doc.text(periodText, 20, 35);
-    doc.text(`Data de geração: ${new Date().toLocaleDateString('pt-BR')}`, 20, 40);
+      ? `Desde o início`
+      : `Últimos ${reportDays} dias`;
 
-    // Summary
+    // Calculate Stats
     const greenCount = filteredData.filter(e => e.level === 'green').length;
     const yellowCount = filteredData.filter(e => e.level === 'yellow').length;
     const redCount = filteredData.filter(e => e.level === 'red').length;
 
-    doc.setFontSize(12);
-    doc.text('Resumo do Período', 20, 50);
-    doc.setFontSize(10);
-    doc.text(`✓ Dias Verdes (Bem-estar): ${greenCount}`, 25, 57);
-    doc.text(`⚠ Dias Amarelos (Atenção): ${yellowCount}`, 25, 63);
-    doc.text(`✗ Dias Vermelhos (Desgaste): ${redCount}`, 25, 69);
+    const avgFeeling = filteredData.length ? (filteredData.reduce((sum, e) => sum + e.feeling, 0) / filteredData.length).toFixed(1) : '-';
+    const avgEnergy = filteredData.length ? (filteredData.reduce((sum, e) => sum + e.energy, 0) / filteredData.length).toFixed(1) : '-';
+    const avgMood = filteredData.length ? (filteredData.reduce((sum, e) => sum + e.mood, 0) / filteredData.length).toFixed(1) : '-';
 
-    // Check-ins table
+    const sleepGreat = filteredData.filter(e => e.sleep === 'great').length;
+    const sleepOk = filteredData.filter(e => e.sleep === 'ok').length;
+    const sleepBad = filteredData.filter(e => e.sleep === 'bad').length;
+
+    // Use Grid Layout
+    const startY = pdf.getCurrentY();
+    const margin = pdf.getMargin();
+    const contentWidth = pdf.getContentWidth();
+    const colGap = 10;
+    const colWidth = (contentWidth - (colGap * 2)) / 3;
+
+    // -- Top Section: Performance Geral --
+    // We can draw a large section or individual cards. Let's do individual cards for visual separation but grouped.
+
+    // Card 1: Resumo
+    pdf.drawCard(margin, startY, colWidth, 40, 'Resumo de Dias');
+    pdf.addMetricAt(margin + 5, startY + 15, 'Verdes (Bem-estar)', greenCount.toString());
+    pdf.addMetricAt(margin + (colWidth / 2) + 5, startY + 15, 'Amarelos', yellowCount.toString());
+    pdf.addMetricAt(margin + 5, startY + 28, 'Vermelhos (Risco)', redCount.toString());
+
+    // Card 2: Médias
+    pdf.drawCard(margin + colWidth + colGap, startY, colWidth, 40, 'Médias do Período');
+    pdf.addMetricAt(margin + colWidth + colGap + 5, startY + 15, 'Sentimento', avgFeeling + '/5');
+    pdf.addMetricAt(margin + colWidth + colGap + (colWidth / 2) + 5, startY + 15, 'Energia', avgEnergy + '/5');
+    pdf.addMetricAt(margin + colWidth + colGap + 5, startY + 28, 'Humor', avgMood + '/5');
+
+    // Card 3: Sono
+    pdf.drawCard(margin + (colWidth * 2) + (colGap * 2), startY, colWidth, 40, 'Qualidade do Sono');
+    pdf.addMetricAt(margin + (colWidth * 2) + (colGap * 2) + 5, startY + 15, 'Noites Ótimas', sleepGreat.toString());
+    pdf.addMetricAt(margin + (colWidth * 2) + (colGap * 2) + (colWidth / 2) + 5, startY + 15, 'Normais', sleepOk.toString());
+    pdf.addMetricAt(margin + (colWidth * 2) + (colGap * 2) + 5, startY + 28, 'Ruins', sleepBad.toString());
+
+    // Move Y past the cards
+    pdf.moveY(50); // 40 height + 10 margin
+
+    // Context info line
+    pdf.addTextAt(margin, pdf.getCurrentY(), `${periodText} • Total de registros: ${filteredData.length}`, 9, { color: [100, 100, 100] });
+    pdf.moveY(8);
+
+    // -- Table Section using autoTable --
     if (filteredData.length > 0) {
-      const tableData = filteredData.map(entry => [
-        new Date(entry.date).toLocaleDateString('pt-BR'),
-        entry.time,
+      const headers = ['Data', 'Nível', 'Sentimento', 'Energia', 'Humor', 'Sono'];
+      const body = filteredData.map(entry => [
+        `${new Date(entry.date).toLocaleDateString('pt-BR')} ${entry.time}`,
         entry.level === 'green' ? 'Verde' : entry.level === 'yellow' ? 'Amarelo' : 'Vermelho',
-        `${entry.feeling}/5`,
-        `${entry.energy}/5`,
-        `${entry.mood}/5`
+        entry.feeling.toString(), // Simplified to save space
+        entry.energy.toString(),
+        entry.mood.toString(),
+        entry.sleep === 'great' ? 'Ótimo' : entry.sleep === 'ok' ? 'Ok' : 'Ruim'
       ]);
 
-      autoTable(doc, {
-        head: [['Data', 'Hora', 'Nível', 'Sentimento', 'Energia', 'Humor']],
-        body: tableData,
-        startY: 75,
-        theme: 'striped',
-        headStyles: { fillColor: [13, 148, 136] }
-      });
+      pdf.addTable(headers, body);
+    } else {
+      pdf.addText("Nenhum registro encontrado para este período.");
     }
 
-    // Trends Analysis
-    const finalY = (doc as any).lastAutoTable?.finalY || 75;
+    // -- Recommendations (Compact Footer) --
+    // Check if we have space, otherwise add page
+    pdf.moveY(10);
+    pdf.addSection('Sugestões');
 
-    // Calculate averages
-    const avgFeeling = (filteredData.reduce((sum, e) => sum + e.feeling, 0) / filteredData.length).toFixed(1);
-    const avgEnergy = (filteredData.reduce((sum, e) => sum + e.energy, 0) / filteredData.length).toFixed(1);
-    const avgMood = (filteredData.reduce((sum, e) => sum + e.mood, 0) / filteredData.length).toFixed(1);
-
-    doc.setFontSize(12);
-    doc.text('Análise de Tendências', 20, finalY + 15);
-
-    doc.setFontSize(10);
-    doc.text(`Média de Sentimento: ${avgFeeling}/5`, 25, finalY + 23);
-    doc.text(`Média de Energia: ${avgEnergy}/5`, 25, finalY + 29);
-    doc.text(`Média de Humor: ${avgMood}/5`, 25, finalY + 35);
-
-    // Visual trend bars
-    const drawBar = (y: number, value: number, label: string, color: [number, number, number]) => {
-      doc.setFillColor(color[0], color[1], color[2]);
-      const barWidth = (value / 5) * 80;
-      doc.rect(25, y, barWidth, 4, 'F');
-      doc.setDrawColor(200, 200, 200);
-      doc.rect(25, y, 80, 4, 'S');
-    };
-
-    drawBar(finalY + 43, parseFloat(avgFeeling), 'Sentimento', [59, 130, 246]); // Blue
-    drawBar(finalY + 50, parseFloat(avgEnergy), 'Energia', [16, 185, 129]); // Green
-    drawBar(finalY + 57, parseFloat(avgMood), 'Humor', [245, 158, 11]); // Orange
-
-    // Sleep quality
-    const sleepStats = {
-      great: filteredData.filter(e => e.sleep === 'great').length,
-      ok: filteredData.filter(e => e.sleep === 'ok').length,
-      bad: filteredData.filter(e => e.sleep === 'bad').length
-    };
-
-    doc.setFontSize(10);
-    doc.text('Qualidade do Sono:', 25, finalY + 67);
-    doc.setFontSize(9);
-    doc.text(`Ótimo: ${sleepStats.great} dias | Ok: ${sleepStats.ok} dias | Ruim: ${sleepStats.bad} dias`, 25, finalY + 73);
-
-    // Recommendations
-    doc.setFontSize(12);
-    doc.text('Sugestões Gerais de Autocuidado', 20, finalY + 85);
-    doc.setFontSize(9);
+    // Draw compact suggestions in 2 columns
     const suggestions = [
-      '• Mantenha uma rotina regular de sono',
-      '• Faça pausas regulares durante o estudo',
-      '• Pratique atividades físicas leves',
-      '• Mantenha contato com amigos e família',
-      '• Busque ajuda profissional se necessário'
+      '• Mantenha uma rotina regular de sono.',
+      '• Faça pausas regulares durante o estudo.',
+      '• Pratique atividades físicas leves.',
+      '• Mantenha contato com amigos e família.',
+      '• Busque ajuda profissional se necessário.'
     ];
+
+    const startSuggestionsY = pdf.getCurrentY();
     suggestions.forEach((sug, idx) => {
-      doc.text(sug, 25, finalY + 92 + (idx * 6));
+      // Simple 1-column list for readability, but compact line height
+      pdf.addText(sug, 9);
     });
 
+    // Save
     const fileName = reportDays === 'all'
-      ? 'relatorio-bem-estar-completo.pdf'
-      : `relatorio-bem-estar-${reportDays}dias.pdf`;
+      ? 'relatorio-bem-estar-completo'
+      : `relatorio-bem-estar-${reportDays}dias`;
 
-    // Using FileSaver.js for cross-browser compatibility
-    const blob = doc.output('blob');
-    saveAs(blob, fileName);
+    pdf.save(fileName);
 
     toast({
       title: "Relatório gerado",

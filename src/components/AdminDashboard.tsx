@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +10,7 @@ import { UserSummary } from '@/hooks/useAdminData';
 import AdminUserAnalysis from './AdminUserAnalysis';
 import { AdminUserManagement } from './AdminUserManagement';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AdminDashboardProps {
   users: UserSummary[];
@@ -19,6 +21,7 @@ interface AdminDashboardProps {
 const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProps) => {
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [freezingUserId, setFreezingUserId] = useState<string | null>(null);
+  const { isMentor } = useAuth();
 
   const handleViewAnalysis = (user: UserSummary) => {
     setSelectedUser(user);
@@ -66,15 +69,15 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
       <div className="flex items-center gap-3">
         <Users className="w-8 h-8 text-primary" />
         <div>
-          <h2 className="text-2xl font-bold">Painel do Administrador</h2>
-          <p className="text-muted-foreground">Gerencie usuários e acesso à plataforma</p>
+          <h2 className="text-2xl font-bold">{isMentor ? 'Painel do Mentor' : 'Painel do Administrador'}</h2>
+          <p className="text-muted-foreground">{isMentor ? 'Acompanhe o desempenho dos seus alunos' : 'Gerencie usuários e acesso à plataforma'}</p>
         </div>
       </div>
 
       <Tabs defaultValue="dashboard" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="dashboard">Visão Geral & Alunos</TabsTrigger>
-          <TabsTrigger value="access-control">Controle de Acessos</TabsTrigger>
+          {!isMentor && <TabsTrigger value="access-control">Controle de Acessos</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6 animate-in fade-in-50 duration-300">
@@ -191,26 +194,28 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant={user.frozen ? "default" : "destructive"}
-                            size="sm"
-                            onClick={() => handleToggleFreeze(user)}
-                            disabled={freezingUserId === user.user_id}
-                          >
-                            {freezingUserId === user.user_id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-                            ) : user.frozen ? (
-                              <>
-                                <Unlock className="w-4 h-4 mr-1" />
-                                Descongelar
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="w-4 h-4 mr-1" />
-                                Congelar
-                              </>
-                            )}
-                          </Button>
+                          {!isMentor && (
+                            <Button
+                              variant={user.frozen ? "default" : "destructive"}
+                              size="sm"
+                              onClick={() => handleToggleFreeze(user)}
+                              disabled={freezingUserId === user.user_id}
+                            >
+                              {freezingUserId === user.user_id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                              ) : user.frozen ? (
+                                <>
+                                  <Unlock className="w-4 h-4 mr-1" />
+                                  Descongelar
+                                </>
+                              ) : (
+                                <>
+                                  <Lock className="w-4 h-4 mr-1" />
+                                  Congelar
+                                </>
+                              )}
+                            </Button>
+                          )}
                           <Button variant="outline" size="sm" onClick={() => handleViewAnalysis(user)}>
                             <BarChart3 className="w-4 h-4 mr-1" />
                             Análise
@@ -225,9 +230,11 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
           </Card>
         </TabsContent>
 
-        <TabsContent value="access-control" className="animate-in fade-in-50 duration-300">
-          <AdminUserManagement />
-        </TabsContent>
+        {!isMentor && (
+          <TabsContent value="access-control" className="animate-in fade-in-50 duration-300">
+            <AdminUserManagement />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

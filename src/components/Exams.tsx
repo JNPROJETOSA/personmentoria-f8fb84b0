@@ -16,7 +16,17 @@ import autoTable from 'jspdf-autotable';
 import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 import { getPerformanceColor } from '@/lib/utils';
 import { saveAs } from 'file-saver';
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 interface ExamsProps {
   exams: ExamLog[];
   addExam: (exam: Omit<ExamLog, 'id'>) => Promise<void>;
@@ -35,6 +45,9 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
     areas: [],
     areaDetails: []
   });
+
+  const [inputMode, setInputMode] = useState<'detailed' | 'simple'>('detailed');
+  const [simpleInput, setSimpleInput] = useState({ correct: 0, total: 0 });
 
   const [areaInputs, setAreaInputs] = useState<Record<string, { correct: number; total: number }>>({});
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
@@ -79,15 +92,55 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
       return;
     }
 
-    // Calculate totals from area details
-    const areaDetails = Object.entries(areaInputs).map(([area, data]) => ({
-      area: area as MedicalArea,
-      correct: data.correct,
-      total: data.total
-    }));
+    let calculatedTotal = 0;
+    let calculatedCorrect = 0;
+    let areaDetails: any[] = [];
+    let areasList: MedicalArea[] = [];
 
-    const calculatedTotal = areaDetails.reduce((sum, ad) => sum + ad.total, 0);
-    const calculatedCorrect = areaDetails.reduce((sum, ad) => sum + ad.correct, 0);
+    if (inputMode === 'detailed') {
+      // Calculate totals from area details
+      areaDetails = Object.entries(areaInputs).map(([area, data]) => ({
+        area: area as MedicalArea,
+        correct: data.correct,
+        total: data.total
+      }));
+
+      calculatedTotal = areaDetails.reduce((sum, ad) => sum + ad.total, 0);
+      calculatedCorrect = areaDetails.reduce((sum, ad) => sum + ad.correct, 0);
+      areasList = newExam.areas || [];
+
+      if (calculatedTotal === 0 && isMountedRef.current) {
+        toast({
+          title: "Dados incompletos",
+          description: "Adicione pelo menos uma área com questões.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+    } else {
+      // Simple mode
+      calculatedTotal = simpleInput.total;
+      calculatedCorrect = simpleInput.correct;
+
+      if (calculatedTotal === 0 && isMountedRef.current) {
+        toast({
+          title: "Dados inválidos",
+          description: "O total de questões deve ser maior que zero.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (calculatedCorrect > calculatedTotal && isMountedRef.current) {
+        toast({
+          title: "Dados inválidos",
+          description: "O número de acertos não pode ser maior que o total.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
 
     const item: Omit<ExamLog, 'id'> = {
       name: newExam.name,
@@ -95,12 +148,12 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
       date: newExam.date!,
       totalQuestions: calculatedTotal,
       correctAnswers: calculatedCorrect,
-      areas: newExam.areas!,
-      areaDetails
+      areas: areasList,
+      areaDetails: areaDetails
     };
 
     addExam(item);
-    addXP(100); // XP_REWARDS.EXAM
+    addXP(100);
 
     if (!isMountedRef.current) return;
 
@@ -120,6 +173,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
       areaDetails: []
     });
     setAreaInputs({});
+    setSimpleInput({ correct: 0, total: 0 });
   };
 
   const handleDelete = (id: string) => {
@@ -142,91 +196,45 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
     setExpandedExams(newExpanded);
   };
 
-  const generateExamPDF = (exam: ExamLog) => {
+  const generateExamPDF = async (exam: ExamLog) => {
     try {
-      const doc = new jsPDF();
+      const { PdfService } = await import('@/lib/pdf-service');
+      const pdf = new PdfService();
+
+      await pdf.initialize('Boletim de Desempenho');
+
       const accuracy = (exam.correctAnswers / exam.totalQuestions) * 100;
 
-      // Colors
-      const perryTeal: [number, number, number] = [13, 148, 136];
-      const softGrey: [number, number, number] = [245, 247, 250];
-      const darkText: [number, number, number] = [51, 65, 85];
-      const indigoHeader: [number, number, number] = [79, 70, 229];
+      // Subtitle with Exam Details
+      pdf.addSubtitle(`${exam.name} • ${exam.institution} • ${new Date(exam.date).toLocaleDateString('pt-BR')}`);
 
-      // Header - Perry Teal bar
-      doc.setFillColor(...perryTeal);
-      doc.rect(0, 0, 210, 25, 'F');
+      // --- Executive Summary (Grid) ---
+      const startY = pdf.getCurrentY();
+      const margin = pdf.getMargin();
+      const contentWidth = pdf.getContentWidth();
+      const colGap = 10;
+      const colWidth = (contentWidth - (colGap * 2)) / 3;
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Mentoria Regisdência - Boletim de Desempenho', 105, 12, { align: 'center' });
+      // Card 1: Questões
+      pdf.drawCard(margin, startY, colWidth, 40, 'Questões Totais');
+      pdf.addMetricAt(margin + (colWidth / 2), startY + 15, '', exam.totalQuestions.toString(), 'center');
 
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Certificado de Rendimento Individual', 105, 19, { align: 'center' });
+      // Card 2: Acertos
+      pdf.drawCard(margin + colWidth + colGap, startY, colWidth, 40, 'Acertos');
+      pdf.addMetricAt(margin + colWidth + colGap + (colWidth / 2), startY + 15, '', exam.correctAnswers.toString(), 'center');
 
-      // Exam info section
-      doc.setTextColor(...darkText);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${exam.name}`, 20, 38);
+      // Card 3: Aproveitamento
+      pdf.drawCard(margin + (colWidth * 2) + (colGap * 2), startY, colWidth, 40, 'Aproveitamento');
+      pdf.addMetricAt(margin + (colWidth * 2) + (colGap * 2) + (colWidth / 2), startY + 15, '', `${accuracy.toFixed(1)}%`, 'center');
 
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Instituição: ${exam.institution}`, 20, 46);
-      doc.text(`Data: ${new Date(exam.date).toLocaleDateString('pt-BR')}`, 20, 52);
+      pdf.moveY(55);
 
-      // Executive Summary Card
-      doc.setFillColor(...softGrey);
-      doc.roundedRect(20, 60, 170, 28, 3, 3, 'F');
-
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text('RESUMO EXECUTIVO', 105, 67, { align: 'center' });
-
-      const kpiX = [45, 105, 165];
-      const kpiLabels = ['Questões Totais', 'Acertos', 'Aproveitamento'];
-      const kpiValues = [
-        exam.totalQuestions.toString(),
-        exam.correctAnswers.toString(),
-        `${accuracy.toFixed(1)}%`
-      ];
-
-      kpiLabels.forEach((label, idx) => {
-        doc.setFontSize(9);
-        doc.setTextColor(100, 100, 100);
-        doc.text(label, kpiX[idx], 75, { align: 'center' });
-
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-
-        if (idx === 2) {
-          // Color-code the accuracy
-          if (accuracy >= 80) {
-            doc.setTextColor(16, 185, 129); // Emerald
-          } else if (accuracy >= 60) {
-            doc.setTextColor(245, 158, 11); // Amber
-          } else {
-            doc.setTextColor(239, 68, 68); // Red
-          }
-        } else {
-          doc.setTextColor(...darkText);
-        }
-
-        doc.text(kpiValues[idx], kpiX[idx], 84, { align: 'center' });
-      });
-
-      doc.setFont('helvetica', 'normal');
-
-      // Performance by Area table
+      // --- Detailed Table ---
       if (exam.areaDetails && exam.areaDetails.length > 0) {
-        doc.setTextColor(...darkText);
-        doc.setFontSize(13);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Desempenho Detalhado por Área Médica', 20, 100);
+        pdf.addSection('Desempenho por Área');
 
-        const tableData = exam.areaDetails.map(ad => {
+        const headers = ['Área Médica', 'Total', 'Acertos', 'Aproveitamento'];
+        const body = exam.areaDetails.map(ad => {
           const areaAccuracy = ad.total > 0 ? (ad.correct / ad.total) * 100 : 0;
           return [
             ad.area,
@@ -236,59 +244,36 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
           ];
         });
 
-        autoTable(doc, {
-          startY: 105,
-          head: [['Área Médica', 'Questões', 'Acertos', 'Nota (%)']],
-          body: tableData,
-          theme: 'striped',
-          headStyles: {
-            fillColor: indigoHeader,
-            textColor: [255, 255, 255] as [number, number, number],
-            fontSize: 11,
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          bodyStyles: {
-            fontSize: 10,
-            textColor: darkText
-          },
+        pdf.addTable(headers, body, {
           columnStyles: {
-            0: { cellWidth: 70, halign: 'left' },
-            1: { cellWidth: 40, halign: 'center' },
-            2: { cellWidth: 40, halign: 'center' },
-            3: { cellWidth: 40, halign: 'center', fontStyle: 'bold' }
+            0: { halign: 'left' },
+            1: { halign: 'center', cellWidth: 30 },
+            2: { halign: 'center', cellWidth: 30 },
+            3: { halign: 'center', cellWidth: 40, fontStyle: 'bold' }
           },
-          alternateRowStyles: {
-            fillColor: [249, 250, 251] as [number, number, number]
-          },
-          margin: { left: 20, right: 20 }
+          didDrawCell: (data: any) => {
+            // Example: Colorize Accuracy column 
+            if (data.section === 'body' && data.column.index === 3) {
+              const value = parseFloat(data.cell.raw.replace('%', ''));
+              if (value >= 80) data.cell.styles.textColor = [16, 185, 129]; // Emerald
+              else if (value >= 60) data.cell.styles.textColor = [245, 158, 11]; // Amber
+              else data.cell.styles.textColor = [239, 68, 68]; // Red
+            }
+          }
         });
+      } else {
+        pdf.addText("Nenhum detalhe por área disponível para esta prova.");
       }
 
-      // Footer
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(
-          `Gerado em ${new Date().toLocaleString('pt-BR')} via Mentoria Regisdência - Página ${i} de ${pageCount}`,
-          105,
-          285,
-          { align: 'center' }
-        );
-      }
-
-      // Using FileSaver.js for cross-browser compatibility
-      const filename = `boletim-${exam.name.toLowerCase().replace(/\s/g, '-')}.pdf`;
-      const blob = doc.output('blob');
-      saveAs(blob, filename);
+      const filename = `boletim-${exam.name.toLowerCase().replace(/\s/g, '-')}`;
+      pdf.save(filename);
 
       toast({
         title: "PDF gerado!",
         description: "O boletim foi baixado com sucesso.",
       });
     } catch (error) {
+      console.error(error);
       toast({
         title: "Erro ao gerar PDF",
         description: "Ocorreu um erro ao criar o boletim.",
@@ -408,54 +393,121 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
           </div>
 
           <div className="space-y-3">
-            <Label>Desempenho por Área (Detalhado)</Label>
-            <p className="text-sm text-muted-foreground">Selecione as áreas e insira os acertos/total de cada uma</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.values(MedicalArea).map(area => (
-                <div key={area} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`area-${area}`}
-                      checked={newExam.areas?.includes(area)}
-                      onCheckedChange={() => handleAreaToggle(area)}
-                    />
-                    <label
-                      htmlFor={`area-${area}`}
-                      className="text-sm font-medium cursor-pointer leading-none"
-                    >
-                      {area}
-                    </label>
-                  </div>
-
-                  {newExam.areas?.includes(area) && (
-                    <div className="grid grid-cols-2 gap-2 pl-6">
-                      <div className="space-y-1">
-                        <Label htmlFor={`correct-${area}`} className="text-xs">Acertos</Label>
-                        <Input
-                          id={`correct-${area}`}
-                          type="number"
-                          min={0}
-                          placeholder="0"
-                          value={areaInputs[area]?.correct || ''}
-                          onChange={(e) => handleAreaInputChange(area, 'correct', Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`total-${area}`} className="text-xs">Total</Label>
-                        <Input
-                          id={`total-${area}`}
-                          type="number"
-                          min={0}
-                          placeholder="0"
-                          value={areaInputs[area]?.total || ''}
-                          onChange={(e) => handleAreaInputChange(area, 'total', Number(e.target.value))}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="flex flex-col space-y-2 mb-4">
+              <Label>Tipo de Inserção</Label>
+              <div className="flex gap-4">
+                <Button
+                  variant={inputMode === 'detailed' ? 'default' : 'outline'}
+                  onClick={() => setInputMode('detailed')}
+                  size="sm"
+                  className="w-full md:w-auto"
+                >
+                  Por Área (Detalhado)
+                </Button>
+                <Button
+                  variant={inputMode === 'simple' ? 'default' : 'outline'}
+                  onClick={() => setInputMode('simple')}
+                  size="sm"
+                  className="w-full md:w-auto"
+                >
+                  Total Geral (Simplificado)
+                </Button>
+              </div>
             </div>
+
+            {inputMode === 'detailed' ? (
+              <>
+                <Label>Desempenho por Área (Detalhado)</Label>
+                <p className="text-sm text-muted-foreground">Selecione as áreas e insira os acertos/total de cada uma</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.values(MedicalArea).map(area => (
+                    <div key={area} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`area-${area}`}
+                          checked={newExam.areas?.includes(area)}
+                          onCheckedChange={() => handleAreaToggle(area)}
+                        />
+                        <label
+                          htmlFor={`area-${area}`}
+                          className="text-sm font-medium cursor-pointer leading-none"
+                        >
+                          {area}
+                        </label>
+                      </div>
+
+                      {newExam.areas?.includes(area) && (
+                        <div className="grid grid-cols-2 gap-2 pl-6">
+                          <div className="space-y-1">
+                            <Label htmlFor={`correct-${area}`} className="text-xs">Acertos</Label>
+                            <Input
+                              id={`correct-${area}`}
+                              type="number"
+                              min={0}
+                              placeholder="0"
+                              value={areaInputs[area]?.correct || ''}
+                              onChange={(e) => handleAreaInputChange(area, 'correct', Number(e.target.value))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`total-${area}`} className="text-xs">Total</Label>
+                            <Input
+                              id={`total-${area}`}
+                              type="number"
+                              min={0}
+                              placeholder="0"
+                              value={areaInputs[area]?.total || ''}
+                              onChange={(e) => handleAreaInputChange(area, 'total', Number(e.target.value))}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+                <div>
+                  <h4 className="font-medium mb-1">Resultado Geral da Prova</h4>
+                  <p className="text-sm text-muted-foreground">Insira apenas o total de questões e o número de acertos.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="total-simple" className="text-base">Total de Questões</Label>
+                    <Input
+                      id="total-simple"
+                      type="number"
+                      min={1}
+                      placeholder="Ex: 100"
+                      className="text-lg"
+                      value={simpleInput.total || ''}
+                      onChange={(e) => setSimpleInput({ ...simpleInput, total: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="correct-simple" className="text-base">Total de Acertos</Label>
+                    <Input
+                      id="correct-simple"
+                      type="number"
+                      min={0}
+                      placeholder="Ex: 75"
+                      className="text-lg"
+                      value={simpleInput.correct || ''}
+                      onChange={(e) => setSimpleInput({ ...simpleInput, correct: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                {simpleInput.total > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-background rounded border">
+                    <span className="font-medium">Aproveitamento Calculado:</span>
+                    <span className={`font-bold text-lg ${getPerformanceColor((simpleInput.correct / simpleInput.total) * 100)}`}>
+                      {((simpleInput.correct / simpleInput.total) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <Button onClick={handleAdd} className="w-full">
@@ -515,20 +567,39 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
                           <Download className="w-4 h-4" />
                         </Button>
 
+
+
                         <CollapsibleTrigger asChild>
                           <Button variant="outline" size="icon">
                             <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           </Button>
                         </CollapsibleTrigger>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(exam.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Tem certeza que deseja excluir?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Essa ação não pode ser desfeita. O registro da prova "{exam.name}" será permanentemente removido do seu histórico.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(exam.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
 

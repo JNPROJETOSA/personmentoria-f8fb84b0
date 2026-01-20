@@ -10,6 +10,9 @@ interface Profile {
   streak: number;
   last_study_date: string | null;
   frozen: boolean;
+  exam_year: string | null;
+  target_institutions: string[] | null;
+  target_specialty: string | null;
 }
 
 export function useProfile(userId: string | undefined) {
@@ -32,7 +35,14 @@ export function useProfile(userId: string | undefined) {
       if (error) {
         console.error('Error fetching profile:', error);
       } else {
-        setProfile(data);
+        // Type assertion to handle potential missing columns before migration is run
+        const profileData = data as any;
+        setProfile({
+          ...profileData,
+          exam_year: profileData.exam_year || null,
+          target_institutions: profileData.target_institutions || null,
+          target_specialty: profileData.target_specialty || null
+        } as Profile);
       }
       setLoading(false);
     };

@@ -12,7 +12,7 @@ import Reports from '@/components/Reports';
 import Notebook from '@/components/Notebook';
 import Pomodoro from '@/components/Pomodoro';
 import Flashcards from '@/components/Flashcards';
-import BancaAnalysis from '@/components/BancaAnalysis';
+import PDFRepository from '@/components/PDFRepository';
 import DreamBoard from '@/components/DreamBoard';
 import Editorial from '@/components/Editorial';
 import XoBurnout from '@/components/XoBurnout';
@@ -81,7 +81,7 @@ const AuthenticatedApp = () => {
   const { folders, addFolder, updateFolder, deleteFolder } = useFlashcardFolders(user?.id);
   const { goals, updateGoals } = useGoals(user?.id);
   const { items: dreamBoardItems, addItem: addDreamItem, deleteItem: deleteDreamItem } = useDreamBoard(user?.id);
-  const { notebookData, updateNotebook } = useNotebook(user?.id);
+  // Notebook now manages its own hooks
   const { exams, addExam, deleteExam } = useExams(user?.id);
   const { reviews: manualReviews, addReview } = useReviews(user?.id);
   const { editorials, selectedEditorialId, setSelectedEditorialId, editorialData, updateTopicStatus, setEditorialData, createEditorial, deleteEditorial, renameEditorial, deleteSubarea, renameSubarea, deleteTopic, renameTopic } = useEditorial(user?.id);
@@ -89,8 +89,8 @@ const AuthenticatedApp = () => {
   const { examModeData, addSession: addExamSession, updateMantra, setExamModeData, loading: examModeLoading } = useExamMode(user?.id);
 
   // Admin hooks
-  const { isAdmin, loading: authLoading } = useAuth();
-  const { users: adminUsers, loading: adminLoading, toggleFreezeUser } = useAdminData(isAdmin);
+  const { isAdmin, isMentor, loading: authLoading } = useAuth();
+  const { users: adminUsers, loading: adminLoading, toggleFreezeUser } = useAdminData(isAdmin || isMentor);
 
   // Check if user is frozen
   const isFrozen = profile?.frozen || false;
@@ -269,7 +269,7 @@ const AuthenticatedApp = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
+      case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} userId={user?.id} />;
       case 'analysis': return <Analysis exercises={exercises} />;
       case 'classes': return <Classes classes={classes} addClass={addClass} updateClass={updateClass} deleteClass={deleteClass} />;
       case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} classes={classes} onAutoCompleteReview={handleAutoCompleteReview} />;
@@ -277,18 +277,18 @@ const AuthenticatedApp = () => {
       case 'exams': return <Exams exams={exams} addExam={addExam} deleteExam={deleteExam} addXP={handleAddXP} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;
       case 'reports': return <Reports exercises={exercises} classes={classes} exams={exams} />;
-      case 'notebook': return <Notebook data={notebookData} onUpdate={updateNotebook} />;
+      case 'notebook': return <Notebook userId={user?.id} />;
       case 'pomodoro': return <Pomodoro />;
       case 'mind-maps': return <MindMaps userId={user?.id} />;
       case 'flashcards': return <Flashcards flashcards={flashcards} folders={folders} addFlashcard={addFlashcard} deleteFlashcard={deleteFlashcard} updateFlashcard={updateFlashcard} addFolder={addFolder} updateFolder={updateFolder} deleteFolder={deleteFolder} />;
-      case 'banca-analysis': return <BancaAnalysis exams={exams} />;
+      case 'banca-analysis': return <PDFRepository isAdmin={isAdmin} />;
       case 'dream-board': return <DreamBoard items={dreamBoardItems} addItem={addDreamItem} deleteItem={deleteDreamItem} />;
       case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} editorials={editorials} selectedEditorialId={selectedEditorialId} setSelectedEditorialId={setSelectedEditorialId} createEditorial={createEditorial} deleteEditorial={deleteEditorial} renameEditorial={renameEditorial} deleteSubarea={deleteSubarea} renameSubarea={renameSubarea} deleteTopic={deleteTopic} renameTopic={renameTopic} />;
       case 'xo-burnout': return burnoutLoading ? <div className="text-center py-8">Carregando...</div> : <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
       case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       case 'profile-settings': return <ProfileSettings profile={profile} updateProfile={updateProfile} userEmail={user?.email} />;
       case 'admin': return <AdminDashboard users={adminUsers} loading={adminLoading} toggleFreezeUser={toggleFreezeUser} />;
-      default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} />;
+      default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} userId={user?.id} />;
     }
   };
 
@@ -326,7 +326,7 @@ const AuthenticatedApp = () => {
       >
         <div className="p-6 border-b flex justify-between items-center bg-card">
           <div className="flex items-center gap-3">
-            <BrainCircuit size={36} className="text-primary min-w-[36px]" strokeWidth={2.5} />
+            <img src="/logo.png" alt="Logo" className="w-9 h-9 rounded-full object-cover min-w-[36px]" />
             <div className="flex flex-col">
               <span className="text-lg font-bold leading-none tracking-tight">Mentoria</span>
               <span className="text-xl font-extrabold leading-none text-primary tracking-tight">Regisdência</span>
@@ -382,8 +382,8 @@ const AuthenticatedApp = () => {
           <div className="my-4 border-t pt-4">
             <p className="px-4 text-xs font-semibold text-muted-foreground uppercase mb-2">Conta</p>
             <NavItem id="profile-settings" label="Informações Pessoais" icon={UserCircle} />
-            {isAdmin && (
-              <NavItem id="admin" label="Administrador" icon={Shield} />
+            {(isAdmin || isMentor) && (
+              <NavItem id="admin" label={isMentor ? "Mentoria" : "Administrador"} icon={Shield} />
             )}
 
             <div className="pt-2 space-y-2">
