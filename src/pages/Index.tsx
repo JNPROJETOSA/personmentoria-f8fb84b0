@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile, Timer, UserCircle, Shield, ChevronDown, ChevronRight, Stethoscope, PanelLeft } from 'lucide-react';
@@ -144,7 +145,8 @@ const AuthenticatedApp = () => {
   }, [exercises.length, exams.length, classes.filter(c => c.studied).length]);
 
   const pendingReviews = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    // Use local date (YYYY-MM-DD) to match the stored dates from inputs/reviews
+    const today = format(new Date(), 'yyyy-MM-dd');
     const reviewMap = new Map<string, any>();
     const topicPriorityMap = new Map<string, number>();
 
@@ -241,17 +243,17 @@ const AuthenticatedApp = () => {
     });
   }, [exercises, manualReviews, classes]);
 
-  const handleMarkReviewed = (topic: string) => {
-    addReview(topic);
+  const handleMarkReviewed = (topic: string, area?: string, dueDate?: string) => {
+    addReview(topic, area, dueDate);
   };
 
   // Auto-complete reviews when new exercises are added for a topic with pending review
-  const handleAutoCompleteReview = (topic: string) => {
-    const hasPendingReview = pendingReviews.some(
+  const handleAutoCompleteReview = (topic: string, area?: string) => {
+    const pending = pendingReviews.find(
       r => r.topic.toLowerCase() === topic.toLowerCase()
     );
-    if (hasPendingReview) {
-      addReview(topic);
+    if (pending) {
+      addReview(topic, area, pending.dueDate);
     }
   };
 

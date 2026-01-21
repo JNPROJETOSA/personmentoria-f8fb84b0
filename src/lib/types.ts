@@ -1,7 +1,7 @@
 export enum MedicalArea {
   PEDIATRIA = 'Pediatria',
   GO = 'Ginecologia e Obstetrícia',
-  PREVENTIVA = 'Medicina Preventiva',
+  PREVENTIVA = 'Preventiva',
   CLINICA = 'Clínica Médica',
   CIRURGIA = 'Cirurgia'
 }

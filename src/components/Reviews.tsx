@@ -9,13 +9,13 @@ import { getPerformanceColor } from '@/lib/utils';
 
 interface ReviewsProps {
   reviews: ReviewItem[];
-  onMarkReviewed: (topic: string) => void;
+  onMarkReviewed: (topic: string, area: string, dueDate: string) => void;
   manualReviews: ManualReviewLog[];
 }
 
 export default function Reviews({ reviews, onMarkReviewed, manualReviews }: ReviewsProps) {
-  const handleMark = (topic: string) => {
-    onMarkReviewed(topic);
+  const handleMark = (topic: string, area: string, dueDate: string) => {
+    onMarkReviewed(topic, area, dueDate);
     toast({
       title: "Revisão concluída!",
       description: `"${topic}" foi marcada como revisada.`,
@@ -31,7 +31,7 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
 
   const ReviewCard = ({ review }: { review: ReviewItem }) => {
     const isOverdue = review.dueDate < today;
-    
+
     return (
       <div className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
         <div className="flex-1 min-w-0">
@@ -42,7 +42,7 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
             />
             <span className="font-medium">{review.topic}</span>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
             <span>{review.area}</span>
             <span>•</span>
@@ -60,7 +60,7 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
 
         <Button
           size="sm"
-          onClick={() => handleMark(review.topic)}
+          onClick={() => handleMark(review.topic, review.area, review.dueDate)}
           className="shrink-0"
         >
           <CheckCircle2 className="w-4 h-4 mr-1" />
@@ -201,8 +201,8 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
                   {[...manualReviews]
                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                     .map(review => (
-                      <div 
-                        key={review.id} 
+                      <div
+                        key={review.id}
                         className="flex items-center justify-between p-4 rounded-lg border bg-card"
                       >
                         <div className="flex items-center gap-3">
