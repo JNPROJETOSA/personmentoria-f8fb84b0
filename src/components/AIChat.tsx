@@ -83,7 +83,7 @@ export default function AIChat({ exercises, classes }: AIChatProps) {
 
       // 3. Configure Model with System Instruction
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash", // Updated as per user request
+        model: "gemini-2.5-flash", // Model version explicitly pinned as per request
         systemInstruction: `Você é o Tutor Regis, um mentor de residência médica experiente, motivador e focado.
         
         DADOS DO ALUNO:
