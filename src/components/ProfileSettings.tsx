@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
+
+
 interface ProfileSettingsProps {
   profile: {
     name: string;
@@ -303,5 +305,6 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
         </CardContent>
       </Card>
     </div>
+
   );
 }

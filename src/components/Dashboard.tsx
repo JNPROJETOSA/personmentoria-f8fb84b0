@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Target, TrendingUp, Calendar, Award, Flame, Zap, Trophy, Activity, BrainCircuit, Edit2, Save } from 'lucide-react';
+import { Target, TrendingUp, Calendar, Award, Flame, Zap, Trophy, Activity, BrainCircuit, Edit2, Save, Bell, Info, Megaphone } from 'lucide-react';
 import { WeeklyAgenda } from '@/components/WeeklyAgenda';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useStudyStrategy } from '@/hooks/useStudyStrategy';
 import { ExerciseLog, ClassItem, ReviewItem, Goals, UserProgress, MedicalArea } from '@/lib/types';
 import { AREA_COLORS, RPG_LEVELS } from '@/lib/constants';
 import { getPerformanceColor } from '@/lib/utils';
@@ -43,6 +47,8 @@ function getLevelInfo(xp: number) {
 export default function Dashboard({ exercises, classes, pendingReviews, goals, setGoals, userProgress, userId }: DashboardProps) {
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [tempGoals, setTempGoals] = useState(goals);
+  const { notifications, markAsRead } = useNotifications(userId);
+  const { strategy } = useStudyStrategy(userId);
 
   const last7Days = exercises.filter(ex => {
     const diff = Date.now() - new Date(ex.date).getTime();
@@ -109,6 +115,80 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+
+      {/* Notifications Block */}
+      {notifications.length > 0 && (
+        <div className="space-y-4">
+          {notifications.map(notification => (
+            <Alert key={notification.id} className="border-l-4 border-l-red-500 bg-red-500/10 border-t-0 border-r-0 border-b-0">
+              <div className="flex items-start gap-4">
+                {notification.type === 'Assinatura' ? <Calendar className="h-5 w-5 text-red-500 mt-0.5" /> :
+                  notification.type === 'Material' ? <BrainCircuit className="h-5 w-5 text-red-500 mt-0.5" /> :
+                    <Megaphone className="h-5 w-5 text-red-500 mt-0.5" />}
+
+                <div className="flex-1">
+                  <AlertTitle className="text-red-500 font-bold flex items-center gap-2 mb-1">
+                    {notification.title || 'Nova Mensagem'}
+                    {notification.read && <span className="text-xs font-normal text-muted-foreground ml-2">(Lida)</span>}
+                  </AlertTitle>
+                  <AlertDescription className="text-foreground/90 text-sm leading-relaxed">
+                    {notification.message}
+                  </AlertDescription>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {new Date(notification.created_at).toLocaleDateString('pt-BR')} às {new Date(notification.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} •
+                    Enviado pela Mentoria
+                  </p>
+                </div>
+                {!notification.read && (
+                  <Button variant="ghost" size="sm" onClick={() => markAsRead(notification.id)} className="text-red-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30">
+                    Marcar como lida
+                  </Button>
+                )}
+              </div>
+            </Alert>
+          ))}
+        </div>
+      )}
+
+      {/* Study Strategy Accordion */}
+      <Card className="border-l-4 border-l-indigo-500 shadow-sm">
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="strategy" className="border-none">
+            <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3 text-lg font-semibold text-indigo-700 dark:text-indigo-400">
+                <BrainCircuit className="w-6 h-6" />
+                Estratégia de Estudos
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6 pt-2">
+              <div className="space-y-6">
+
+                {/* Micro Strategy */}
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm text-foreground/70 uppercase tracking-wider flex items-center gap-2">
+                    <Target className="w-4 h-4" /> Estratégia Micro (Ciclo Atual)
+                  </h4>
+                  <div className="bg-muted/30 p-4 rounded-lg border text-sm leading-relaxed whitespace-pre-wrap">
+                    {strategy?.micro_strategy || <span className="text-muted-foreground italic">Nenhuma estratégia micro definida ainda.</span>}
+                  </div>
+                </div>
+
+                {/* Macro Strategy */}
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm text-foreground/70 uppercase tracking-wider flex items-center gap-2">
+                    <Trophy className="w-4 h-4" /> Estratégia Macro (Longo Prazo)
+                  </h4>
+                  <div className="bg-muted/30 p-4 rounded-lg border text-sm leading-relaxed whitespace-pre-wrap">
+                    {strategy?.macro_strategy || <span className="text-muted-foreground italic">Nenhuma estratégia macro definida ainda.</span>}
+                  </div>
+                </div>
+
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </Card>
+
       {/* RPG Gamification Header */}
       <Card className="relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer" />
@@ -391,12 +471,12 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
           </CardHeader>
           <CardContent>
             <div className={`text-3xl font-bold ${exercises.length > 0
-                ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 80
-                  ? 'text-performance-success'
-                  : ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 60
-                    ? 'text-performance-warning'
-                    : 'text-performance-danger'
-                : ''
+              ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 80
+                ? 'text-performance-success'
+                : ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100) >= 60
+                  ? 'text-performance-warning'
+                  : 'text-performance-danger'
+              : ''
               }`}>
               {exercises.length > 0
                 ? ((exercises.reduce((sum, ex) => sum + ex.correctAnswers, 0) / exercises.reduce((sum, ex) => sum + ex.totalQuestions, 0)) * 100).toFixed(1)

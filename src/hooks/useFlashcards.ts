@@ -34,6 +34,7 @@ export function useFlashcards(userId: string | undefined) {
       } else {
         const mapped = data.map(f => ({
           id: f.id,
+          type: (f as any).type || 'standard',
           area: f.area as any,
           front: f.front,
           back: f.back,
@@ -63,7 +64,8 @@ export function useFlashcards(userId: string | undefined) {
         front: flashcard.front,
         back: flashcard.back,
         answer_image_url: flashcard.answer_image_url || null,
-        folder_id: flashcard.folderId || null
+        folder_id: flashcard.folderId || null,
+        type: flashcard.type || 'standard'
       })
       .select()
       .single();
@@ -75,6 +77,7 @@ export function useFlashcards(userId: string | undefined) {
     } else {
       setFlashcards(prev => [...prev, {
         id: data.id,
+        type: (data as any).type || 'standard',
         area: data.area as any,
         front: data.front,
         back: data.back,
@@ -132,6 +135,7 @@ export function useFlashcards(userId: string | undefined) {
     if (updates.back !== undefined) dbUpdates.back = updates.back;
     if (updates.answer_image_url !== undefined) dbUpdates.answer_image_url = updates.answer_image_url;
     if (updates.folderId !== undefined) dbUpdates.folder_id = updates.folderId;
+    if ((updates as any).type !== undefined) dbUpdates.type = (updates as any).type;
 
     const { error } = await supabase
       .from('flashcards')

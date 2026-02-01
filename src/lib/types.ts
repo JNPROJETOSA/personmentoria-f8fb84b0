@@ -6,10 +6,11 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode' | 'profile-settings' | 'admin' | 'mind-maps';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode' | 'profile-settings' | 'admin' | 'meeting' | 'mind-maps';
 
 export interface Flashcard {
   id: string;
+  type?: 'standard' | 'cloze';
   area: MedicalArea;
   front: string;
   back: string;

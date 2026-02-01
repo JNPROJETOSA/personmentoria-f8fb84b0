@@ -21,7 +21,10 @@ import ExamMode from '@/components/ExamMode';
 import ProfileSettings from '@/components/ProfileSettings';
 import AdminDashboard from '@/components/AdminDashboard';
 import FrozenAccountScreen from '@/components/FrozenAccountScreen';
+
 import MindMaps from '@/components/MindMaps';
+import { StudentMeetingScheduler } from '@/components/StudentMeetingScheduler';
+
 
 import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
 import { MOCK_CLASSES_INITIAL, MOCK_EXERCISES_INITIAL, REVIEW_INTERVALS, XP_REWARDS, EDITORIAL_TEMPLATE } from '@/lib/constants';
@@ -64,8 +67,10 @@ const TAB_LABELS: Record<TabType, string> = {
   'ai-tutor': 'TUTOR REGIS',
   'mind-maps': 'Mapas Mentais',
   'profile-settings': 'Informações Pessoais',
+  'meeting': 'Marcar Reunião',
   admin: 'Administrador'
 };
+
 
 const AuthenticatedApp = () => {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -288,8 +293,11 @@ const AuthenticatedApp = () => {
       case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} editorials={editorials} selectedEditorialId={selectedEditorialId} setSelectedEditorialId={setSelectedEditorialId} createEditorial={createEditorial} deleteEditorial={deleteEditorial} renameEditorial={renameEditorial} deleteSubarea={deleteSubarea} renameSubarea={renameSubarea} deleteTopic={deleteTopic} renameTopic={renameTopic} />;
       case 'xo-burnout': return burnoutLoading ? <div className="text-center py-8">Carregando...</div> : <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
       case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
+      case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       case 'profile-settings': return <ProfileSettings profile={profile} updateProfile={updateProfile} userEmail={user?.email} />;
+      case 'meeting': return <StudentMeetingScheduler />;
       case 'admin': return <AdminDashboard users={adminUsers} loading={adminLoading} toggleFreezeUser={toggleFreezeUser} />;
+
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} userId={user?.id} />;
     }
   };
@@ -384,8 +392,10 @@ const AuthenticatedApp = () => {
           <div className="my-4 border-t pt-4">
             <p className="px-4 text-xs font-semibold text-muted-foreground uppercase mb-2">Conta</p>
             <NavItem id="profile-settings" label="Informações Pessoais" icon={UserCircle} />
+            <NavItem id="meeting" label="Marcar Reunião" icon={Calendar} />
             {(isAdmin || isMentor) && (
               <NavItem id="admin" label={isMentor ? "Mentoria" : "Administrador"} icon={Shield} />
+
             )}
 
             <div className="pt-2 space-y-2">

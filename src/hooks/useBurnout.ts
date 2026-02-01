@@ -31,8 +31,12 @@ export function useBurnout(userId: string | undefined) {
       } else {
         const checkIns: CheckInEntry[] = data.map(b => ({
           id: b.id,
-          date: b.date,
-          time: b.created_at?.split('T')[1]?.substring(0, 5) || '00:00',
+          // Fix: Ensure date is strictly YYYY-MM-DD even if DB returns ISO
+          date: b.date ? b.date.split('T')[0] : '',
+          // Fix: Convert UTC created_at to Local Time
+          time: b.created_at
+            ? new Date(b.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            : '00:00',
           feeling: b.feeling,
           energy: b.energy,
           mood: b.mood,
@@ -60,7 +64,7 @@ export function useBurnout(userId: string | undefined) {
   const addCheckIn = async (checkIn: Omit<CheckInEntry, 'id' | 'level'>) => {
     if (!userId) return;
 
-    const level = calculateLevel(checkIn.feeling, checkIn.energy, checkIn.mood, checkIn.stress ? 5 : 1, 
+    const level = calculateLevel(checkIn.feeling, checkIn.energy, checkIn.mood, checkIn.stress ? 5 : 1,
       checkIn.studyPerformance === 'yes' ? 5 : checkIn.studyPerformance === 'partially' ? 3 : 1);
 
     const { data, error } = await supabase
@@ -85,8 +89,10 @@ export function useBurnout(userId: string | undefined) {
       setBurnoutData(prev => ({
         checkIns: [{
           id: data.id,
-          date: data.date,
-          time: data.created_at?.split('T')[1]?.substring(0, 5) || '00:00',
+          date: data.date ? data.date.split('T')[0] : checkIn.date,
+          time: data.created_at
+            ? new Date(data.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            : '00:00',
           feeling: data.feeling,
           energy: data.energy,
           mood: data.mood,

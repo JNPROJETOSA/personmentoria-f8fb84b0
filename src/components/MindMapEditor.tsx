@@ -18,10 +18,8 @@ import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Download, Plus, ArrowLeft, Type, Square, Circle, Trash2, Palette, BrainCircuit } from 'lucide-react';
+import { Save, Plus, ArrowLeft, Type, Square, Circle, Trash2, Palette, BrainCircuit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { MindMap } from '@/hooks/useMindMaps';
 
 // Custom Node Colors
@@ -188,69 +186,38 @@ function MindMapEditorContent({ initialMap, onSave, onBack }: MindMapEditorProps
         });
     };
 
-    const handleExportPDF = async () => {
-        if (!reactFlowWrapper.current) return;
-
-        try {
-            toast({
-                title: "Gerando PDF...",
-                description: "Aguarde enquanto preparamos o documento.",
-            });
-
-            // Capture the flow
-            const canvas = await html2canvas(reactFlowWrapper.current, {
-                ignoreElements: (element) => {
-                    const className = element.className;
-                    if (typeof className === 'string') {
-                        return className.includes('react-flow__controls') || className.includes('react-flow__panel') || className.includes('react-flow__minimap');
-                    }
-                    return false;
-                }
-            });
-            const imgData = canvas.toDataURL('image/png');
-
-            const { PdfService } = await import('@/lib/pdf-service');
-            const pdf = new PdfService();
-            await pdf.initialize('Mapa Mental');
-
-            pdf.addSubtitle(`${title} • Gerado em ${new Date().toLocaleDateString('pt-BR')}`);
-
-            // Calculate dimensions to fit image on page
-            const imgProps = pdf.getDoc().getImageProperties(imgData);
-            const pdfWidth = pdf.getContentWidth();
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-            // Add image
-            // Note: raw addImage usage via getDoc() until PdfService wraps it
-            pdf.getDoc().addImage(imgData, 'PNG', pdf.getMargin(), pdf.getCurrentY(), pdfWidth, pdfHeight);
-
-            pdf.save(`mapa-mental-${title.toLowerCase().replace(/\s/g, '-')}`);
-
-            toast({
-                title: "PDF Exportado!",
-                description: "O arquivo foi baixado com sucesso.",
-            });
-        } catch (error) {
-            console.error('PDF Export Error:', error);
-            toast({
-                title: "Erro ao exportar",
-                description: "Não foi possível gerar o PDF.",
-                variant: "destructive"
-            });
-        }
-    };
-
     // Selection handling
-    const onSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
+    const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+
+    const onSelectionChange = useCallback(({ nodes, edges }: { nodes: Node[], edges: Edge[] }) => {
         if (nodes.length > 0) {
             setSelectedNodeId(nodes[0].id);
+            setSelectedEdgeId(null);
+        } else if (edges.length > 0) {
+            setSelectedEdgeId(edges[0].id);
+            setSelectedNodeId(null);
         } else {
             setSelectedNodeId(null);
+            setSelectedEdgeId(null);
         }
     }, []);
 
     // Update selected value input when selection changes
     const selectedNode = nodes.find(n => n.id === selectedNodeId);
+
+    // Helper to delete node/edge from UI
+    const handleDelete = () => {
+        if (selectedNodeId) {
+            // Delete node AND its connected edges
+            setNodes((nds) => nds.filter((n) => n.id !== selectedNodeId));
+            setEdges((eds) => eds.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
+            setSelectedNodeId(null);
+        } else if (selectedEdgeId) {
+            // Delete edge
+            setEdges((eds) => eds.filter((e) => e.id !== selectedEdgeId));
+            setSelectedEdgeId(null);
+        }
+    };
 
     return (
         <div className="flex flex-col h-[calc(100vh-120px)] w-full bg-background border rounded-lg overflow-hidden animate-in fade-in duration-300">
@@ -267,10 +234,6 @@ function MindMapEditorContent({ initialMap, onSave, onBack }: MindMapEditorProps
                     />
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={handleExportPDF}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Exportar PDF
-                    </Button>
                     <Button onClick={handleSave}>
                         <Save className="w-4 h-4 mr-2" />
                         Salvar
@@ -291,6 +254,7 @@ function MindMapEditorContent({ initialMap, onSave, onBack }: MindMapEditorProps
                     maxZoom={4}
                     fitView={!initialMap}
                     className="bg-slate-50 dark:bg-slate-900"
+                    deleteKeyCode={['Backspace', 'Delete']}
                 >
                     <Controls />
                     <MiniMap />
@@ -301,50 +265,55 @@ function MindMapEditorContent({ initialMap, onSave, onBack }: MindMapEditorProps
                             <Plus className="w-4 h-4 mr-2" /> Tópico Principal
                         </Button>
 
-                        {selectedNode && (
+                        {(selectedNode || selectedEdgeId) && (
                             <div className="space-y-3 pt-2 border-t mt-1">
-                                <span className="text-xs font-semibold text-muted-foreground uppercase">Editar Seleção</span>
+                                <span className="text-xs font-semibold text-muted-foreground uppercase">
+                                    {selectedNode ? 'Editar Tópico' : 'Editar Conexão'}
+                                </span>
 
-                                <Button
-                                    onClick={() => addNode(selectedNodeId!)}
-                                    variant="default"
-                                    size="sm"
-                                    className="w-full justify-start bg-primary/90 hover:bg-primary"
-                                >
-                                    <BrainCircuit className="w-4 h-4 mr-2" /> Adicionar Subtópico
-                                </Button>
+                                {selectedNode && (
+                                    <>
+                                        <Button
+                                            onClick={() => addNode(selectedNodeId!)}
+                                            variant="default"
+                                            size="sm"
+                                            className="w-full justify-start bg-primary/90 hover:bg-primary"
+                                        >
+                                            <BrainCircuit className="w-4 h-4 mr-2" /> Adicionar Subtópico
+                                        </Button>
 
-                                <Input
-                                    value={selectedNode.data.label}
-                                    onChange={updateNodeLabel}
-                                    placeholder="Texto do tópico"
-                                    className="h-8 text-xs"
-                                />
-                                <div className="grid grid-cols-4 gap-1">
-                                    {NODE_COLORS.map(c => (
-                                        <button
-                                            key={c.name}
-                                            className="w-8 h-8 rounded border ring-offset-background hover:ring-2 hover:ring-ring transition-all"
-                                            style={{ backgroundColor: c.value }}
-                                            onClick={() => updateNodeColor(c.value, c.text)}
-                                            title={c.name}
+                                        <Input
+                                            value={selectedNode.data.label}
+                                            onChange={updateNodeLabel}
+                                            placeholder="Texto do tópico"
+                                            className="h-8 text-xs"
                                         />
-                                    ))}
-                                </div>
+                                        <div className="grid grid-cols-4 gap-1">
+                                            {NODE_COLORS.map(c => (
+                                                <button
+                                                    key={c.name}
+                                                    className="w-8 h-8 rounded border ring-offset-background hover:ring-2 hover:ring-ring transition-all"
+                                                    style={{ backgroundColor: c.value }}
+                                                    onClick={() => updateNodeColor(c.value, c.text)}
+                                                    title={c.name}
+                                                />
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+
                                 <Button
                                     variant="destructive"
                                     size="sm"
                                     className="w-full h-8"
-                                    onClick={() => {
-                                        setNodes(nds => nds.filter(n => n.id !== selectedNodeId));
-                                        setSelectedNodeId(null);
-                                    }}
+                                    onClick={handleDelete}
                                 >
-                                    <Trash2 className="w-3 h-3 mr-2" /> Excluir
+                                    <Trash2 className="w-3 h-3 mr-2" />
+                                    {selectedNode ? 'Excluir Tópico' : 'Excluir Conexão'}
                                 </Button>
                             </div>
                         )}
-                        {!selectedNode && (
+                        {!selectedNode && !selectedEdgeId && (
                             <p className="text-xs text-muted-foreground text-center py-2">
                                 Selecione um item para editar
                             </p>

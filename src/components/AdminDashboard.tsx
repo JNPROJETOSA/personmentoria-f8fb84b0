@@ -11,6 +11,8 @@ import AdminUserAnalysis from './AdminUserAnalysis';
 import { AdminUserManagement } from './AdminUserManagement';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { MentorAgenda } from './MentorAgenda';
+
 
 interface AdminDashboardProps {
   users: UserSummary[];
@@ -21,7 +23,7 @@ interface AdminDashboardProps {
 const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProps) => {
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [freezingUserId, setFreezingUserId] = useState<string | null>(null);
-  const { isMentor } = useAuth();
+  const { isMentor, isAdmin } = useAuth();
 
   const handleViewAnalysis = (user: UserSummary) => {
     setSelectedUser(user);
@@ -77,8 +79,11 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
       <Tabs defaultValue="dashboard" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="dashboard">Visão Geral & Alunos</TabsTrigger>
-          {!isMentor && <TabsTrigger value="access-control">Controle de Acessos</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="access-control">Controle de Acessos</TabsTrigger>}
+          {(isMentor || isAdmin) && <TabsTrigger value="agenda">Agenda de Reuniões</TabsTrigger>}
         </TabsList>
+
+
 
         <TabsContent value="dashboard" className="space-y-6 animate-in fade-in-50 duration-300">
           {/* Summary Cards */}
@@ -235,7 +240,15 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
             <AdminUserManagement />
           </TabsContent>
         )}
+
+        {(isMentor || isAdmin) && (
+          <TabsContent value="agenda" className="animate-in fade-in-50 duration-300">
+            <MentorAgenda />
+          </TabsContent>
+        )}
+
       </Tabs>
+
     </div>
   );
 };

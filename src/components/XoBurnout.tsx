@@ -23,6 +23,23 @@ interface XoBurnoutProps {
 
 const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurnoutProps) => {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+
+  // Helper to ensure strict display format: "DD/MM/AAAA"
+  // Handles "YYYY-MM-DD" and "YYYY-MM-DDT..." inputs robustly
+  const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return '--/--/----';
+    try {
+      // Take only the date part before 'T' if strictly ISO
+      const cleanDate = dateString.split('T')[0];
+      const parts = cleanDate.split('-');
+      if (parts.length === 3) {
+        return parts.reverse().join('/');
+      }
+      return cleanDate; // Fallback if format is unexpected
+    } catch (e) {
+      return dateString;
+    }
+  };
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportDays, setReportDays] = useState('7');
 
@@ -67,9 +84,15 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
     const level = calculateLevel(feeling, energy, mood, sleep, stress, studyPerformance);
 
     const now = new Date();
+    // Fix: Use local date to prevent UTC shift (e.g. 22h in Brazil becoming next day)
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const localDateString = `${year}-${month}-${day}`;
+
     const checkIn: Omit<CheckInEntry, 'id' | 'level'> = {
-      date: now.toISOString().split('T')[0],
-      time: now.toTimeString().split(' ')[0].substring(0, 5),
+      date: localDateString,
+      time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       feeling,
       energy,
       mood,
@@ -159,12 +182,18 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
 
   const getChartData = () => {
     const last14Days = burnoutData.checkIns.slice(0, 14).reverse();
-    return last14Days.map(entry => ({
-      date: new Date(entry.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      feeling: entry.feeling,
-      energy: entry.energy,
-      mood: entry.mood
-    }));
+    return last14Days.map(entry => {
+      // Use robust helper
+      const displayDate = formatDateForDisplay(entry.date);
+      // We want just DD/MM for chart usually, so we slice the formatted string "DD/MM/YYYY"
+      const shortDate = displayDate.substring(0, 5);
+      return {
+        date: shortDate,
+        feeling: entry.feeling,
+        energy: entry.energy,
+        mood: entry.mood
+      };
+    });
   };
 
   const getLevelDistribution = () => {
@@ -247,7 +276,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
     if (filteredData.length > 0) {
       const headers = ['Data', 'Nível', 'Sentimento', 'Energia', 'Humor', 'Sono'];
       const body = filteredData.map(entry => [
-        `${new Date(entry.date).toLocaleDateString('pt-BR')} ${entry.time}`,
+        `Registro ${formatDateForDisplay(entry.date)} - ${entry.time}`,
         entry.level === 'green' ? 'Verde' : entry.level === 'yellow' ? 'Amarelo' : 'Vermelho',
         entry.feeling.toString(), // Simplified to save space
         entry.energy.toString(),
@@ -345,7 +374,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {new Date(latestCheckIn.date).toLocaleDateString('pt-BR')} às {latestCheckIn.time}
+                  Registro {formatDateForDisplay(latestCheckIn.date)} - {latestCheckIn.time}
                 </span>
               </div>
               <Badge className={`${getLevelColor(latestCheckIn.level)} border`}>
@@ -430,7 +459,7 @@ const XoBurnout = ({ data: burnoutData, addCheckIn: addBurnoutCheckIn }: XoBurno
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">
-                        {new Date(entry.date).toLocaleDateString('pt-BR')} - {entry.time}
+                        Registro {formatDateForDisplay(entry.date)} - {entry.time}
                       </span>
                       <Badge variant="outline" className="text-xs">
                         {entry.level === 'green' ? '💚' : entry.level === 'yellow' ? '💛' : '❤️'}

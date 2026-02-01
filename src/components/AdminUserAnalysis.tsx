@@ -12,11 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ArrowLeft, BookOpen, PenTool, FileText, Trophy, Target, TrendingUp,
   TrendingDown, Download, Calendar, BarChart3, PieChart as PieChartIcon, CalendarDays, Save, Settings,
-  ChevronDown, ChevronRight, History
+  ChevronDown, ChevronRight, History, Bell, Trash2, Send, BrainCircuit
 } from 'lucide-react';
 import { WeeklyAgenda } from '@/components/WeeklyAgenda';
 import { UserSummary } from '@/hooks/useAdminData';
 import { useGoals } from '@/hooks/useGoals';
+import { useNotifications, NotificationType } from '@/hooks/useNotifications';
+import { useStudyStrategy } from '@/hooks/useStudyStrategy';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { MedicalArea, ExamLog } from '@/lib/types';
 import { getPerformanceColor } from '@/lib/utils';
@@ -122,12 +126,75 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
 
   // Goals management for admin
   const { goals, loading: goalsLoading, updateGoals } = useGoals(user.user_id, true);
-  const [editGoals, setEditGoals] = useState({
+  // Permissions State
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const isMentor = currentUserRole === 'mentor';
+  const isAdmin = currentUserRole === 'admin';
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Based on previous RLS policies, profiles.id matches auth.uid() and has a 'role' column.
+        const { data } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (data) {
+          // @ts-ignore
+          setCurrentUserRole(data.role);
+        }
+      }
+    };
+    fetchUserRole();
+  }, []);
+
+  const [editGoals, setEditGoals] = useState<Goals>({
     weeklyQuestions: 50,
     targetAccuracy: 80,
     targetTopicsPerWeek: 5
   });
   const [savingGoals, setSavingGoals] = useState(false);
+
+  // Notifications Management
+  const { notifications, loading: notificationsLoading, sendNotification, deleteNotification } = useNotifications(user.user_id);
+  const [newNotificationMsg, setNewNotificationMsg] = useState('');
+  const [newNotificationTitle, setNewNotificationTitle] = useState('');
+  const [newNotificationType, setNewNotificationType] = useState<NotificationType>('Aviso');
+  const [sendingNotification, setSendingNotification] = useState(false);
+
+  const handleSendNotification = async () => {
+    if (!newNotificationMsg.trim()) return;
+    setSendingNotification(true);
+    const success = await sendNotification(newNotificationMsg, newNotificationTitle, newNotificationType);
+    if (success) {
+      setNewNotificationMsg('');
+      setNewNotificationTitle('');
+      setNewNotificationType('Aviso');
+    }
+    setSendingNotification(false);
+  };
+
+  // Study Strategy Management
+  const { strategy, loading: strategyLoading, saveStrategy } = useStudyStrategy(user.user_id);
+  const [macroStrategy, setMacroStrategy] = useState('');
+  const [microStrategy, setMicroStrategy] = useState('');
+  const [savingStrategy, setSavingStrategy] = useState(false);
+
+  useEffect(() => {
+    if (strategy) {
+      setMacroStrategy(strategy.macro_strategy || '');
+      setMicroStrategy(strategy.micro_strategy || '');
+    }
+  }, [strategy]);
+
+  const handleSaveStrategy = async () => {
+    setSavingStrategy(true);
+    await saveStrategy(macroStrategy, microStrategy);
+    setSavingStrategy(false);
+  };
 
   // Sync editGoals when goals are loaded
   useEffect(() => {
@@ -772,6 +839,172 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
         </CardHeader>
         <CardContent>
           <WeeklyAgenda userId={user.user_id} isAdminView={true} />
+        </CardContent>
+      </Card>
+
+      {/* Study Strategy Section */}
+      <Card className="border-2 border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BrainCircuit className="w-5 h-5 text-indigo-500" />
+            Estratégia de Estudos
+          </CardTitle>
+          <CardDescription>
+            Defina a estratégia macro e micro para o aluno. O aluno apenas visualiza.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {strategyLoading ? (
+            <div className="text-center py-4 text-muted-foreground">Carregando estratégia...</div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>Estratégia Macro (Longo Prazo)</Label>
+                <div className="relative">
+                  <Textarea
+                    value={macroStrategy}
+                    onChange={e => setMacroStrategy(e.target.value)}
+                    placeholder="Defina a visão geral, objetivos principais e metodologia..."
+                    rows={5}
+                    disabled={isMentor}
+                    className={isMentor ? "opacity-70 bg-muted" : ""}
+                  />
+                  {isMentor && (
+                    <div className="absolute top-2 right-2 text-xs bg-muted px-2 py-1 rounded border text-muted-foreground flex items-center gap-1">
+                      <Target className="w-3 h-3" /> Apenas Leitura (Mentor)
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isMentor ? "Mentores podem visualizar, mas apenas Administradores editam a Macro Estratégia." : "Visível para o aluno na Home."}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Estratégia Micro (Curto Prazo / Ciclo Atual)</Label>
+                <Textarea
+                  value={microStrategy}
+                  onChange={e => setMicroStrategy(e.target.value)}
+                  placeholder="Detalhes do ciclo atual, focos da semana, ajustes pontuais..."
+                  rows={5}
+                />
+                <p className="text-xs text-muted-foreground">Visível para o aluno na Home.</p>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveStrategy} disabled={savingStrategy} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  {savingStrategy ? <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Salvando...</span> : <span className="flex items-center gap-2"><Save className="w-4 h-4" /> Salvar Estratégia</span>}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Manual Notifications Section */}
+      <Card className="border-2 border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-blue-500" />
+            Notificações Manuais
+          </CardTitle>
+          <CardDescription>
+            Envie avisos diretos para o aluno. O aluno verá um alerta na página inicial.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!isAdmin ? (
+            <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed text-sm">
+              <div className="flex justify-center mb-2">
+                <Bell className="w-8 h-8 text-muted-foreground/30" />
+              </div>
+              <p>Funcionalidade restrita a Administradores.</p>
+              <p className="text-xs">Entre em contato com um administrador para enviar notificações.</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 border p-4 rounded-lg bg-card/50">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <Send className="w-4 h-4" /> Nova Notificação
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Título (Opcional)</Label>
+                    <Input
+                      value={newNotificationTitle}
+                      onChange={e => setNewNotificationTitle(e.target.value)}
+                      placeholder="Ex: Lembrete de Renovação"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select value={newNotificationType} onValueChange={(v) => setNewNotificationType(v as NotificationType)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Aviso">Aviso</SelectItem>
+                        <SelectItem value="Assinatura">Assinatura</SelectItem>
+                        <SelectItem value="Material">Material</SelectItem>
+                        <SelectItem value="Outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Mensagem</Label>
+                  <Textarea
+                    value={newNotificationMsg}
+                    onChange={e => setNewNotificationMsg(e.target.value)}
+                    placeholder="Digite a mensagem para o aluno..."
+                    rows={3}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleSendNotification} disabled={sendingNotification || !newNotificationMsg.trim()}>
+                    {sendingNotification ? 'Enviando...' : 'Enviar Notificação'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm">Notificações Ativas ({notifications.length})</h4>
+                {notificationsLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">Carregando...</div>
+                ) : notifications.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                    Nenhuma notificação ativa para este aluno.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.map(notification => (
+                      <div key={notification.id} className="flex items-start justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline">{notification.type}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(notification.created_at).toLocaleString('pt-BR')}
+                            </span>
+                            {notification.read && <Badge variant="secondary" className="text-xs">Lida</Badge>}
+                          </div>
+                          {notification.title && <p className="font-semibold text-sm">{notification.title}</p>}
+                          <p className="text-sm text-foreground/80">{notification.message}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => deleteNotification(notification.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
