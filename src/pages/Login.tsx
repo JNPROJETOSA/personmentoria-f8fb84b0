@@ -22,16 +22,30 @@ export default function Login() {
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                 });
                 if (error) throw error;
-                toast({
-                    title: "Cadastro realizado!",
-                    description: "Verifique seu email para confirmar o cadastro (se necessário) ou faça login.",
-                });
-                setIsSignUp(false); // Switch back to login
+
+                // Check if we have a session immediately (Email Confirmation Disabled or Auto-Confirm)
+                if (data.session) {
+                    toast({
+                        title: "Cadastro realizado!",
+                        description: "Bem-vindo! Você foi logado automaticamente.",
+                    });
+                    navigate('/');
+                } else {
+                    // Session is null -> Email confirmation likely required
+                    toast({
+                        title: "Cadastro realizado!",
+                        description: "Se o login não ocorrer automaticamente, verifique seu email para confirmar o cadastro.",
+                        duration: 6000,
+                    });
+                    // Still switch to login view to be safe, or stay? 
+                    // Let's switch to login so they can try logging in if they are confirmed.
+                    setIsSignUp(false);
+                }
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
                     email,

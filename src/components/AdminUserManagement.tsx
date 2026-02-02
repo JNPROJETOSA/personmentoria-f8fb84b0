@@ -21,7 +21,9 @@ export const AdminUserManagement = () => {
     const [users, setUsers] = useState<WhitelistedUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [newEmail, setNewEmail] = useState('');
+    const [newPassword, setNewPassword] = useState('');
     const [newRole, setNewRole] = useState<'admin' | 'student' | 'mentor'>('student');
+    const [newName, setNewName] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth(); // Current admin user
@@ -56,35 +58,69 @@ export const AdminUserManagement = () => {
         setInviteLoading(true);
 
         try {
-            // 1. Add to Whitelist
-            const { error } = await supabase
-                .from('admin_whitelist')
-                .insert([{
-                    email: newEmail,
-                    role: newRole,
-                    created_by: user?.id
-                }]);
-
-            if (error) {
-                if (error.code === '23505') { // Unique violation
-                    toast({ title: "Usuário já está na lista!", variant: "destructive" });
-                } else {
-                    throw error;
-                }
+            if (newPassword && newPassword.length < 6) {
+                toast({ title: "A senha deve ter no mínimo 6 caracteres.", variant: "destructive" });
+                setInviteLoading(false);
                 return;
             }
 
-            toast({
-                title: "Usuário adicionado!",
-                description: `${newEmail} agora pode se cadastrar como ${newRole}.`
-            });
+            if (newPassword) {
+                // Call SQL RPC to create user
+                const { data, error } = await supabase.rpc('admin_create_user', {
+                    new_email: newEmail,
+                    new_password: newPassword,
+                    new_role: newRole,
+                    new_name: newName
+                });
+
+                if (error) throw error;
+
+                const result = data as any;
+                if (result.status === 'created') {
+                    toast({
+                        title: "Usuário criado com sucesso!",
+                        description: `${newEmail} foi cadastrado e já pode fazer login.`
+                    });
+                } else {
+                    toast({
+                        title: "Usuário atualizado!",
+                        description: `O email ${newEmail} já existia. As permissões foram atualizadas.`
+                    });
+                }
+            } else {
+                // Just whitelist logic
+                const { error } = await supabase
+                    .from('admin_whitelist')
+                    .insert([{
+                        email: newEmail,
+                        role: newRole,
+                        created_by: user?.id
+                    }]);
+
+                if (error) {
+                    if (error.code === '23505') { // Unique violation
+                        toast({ title: "Usuário já está na lista!", variant: "destructive" });
+                    } else {
+                        throw error;
+                    }
+                    return;
+                }
+
+                toast({
+                    title: "Convite enviado (Whitelist)!",
+                    description: `${newEmail} agora pode se cadastrar como ${newRole}.`
+                });
+            }
 
             setNewEmail('');
+            setNewPassword('');
+            setNewName('');
             fetchUsers(); // Refresh list
-        } catch (error) {
-            console.error('Error inviting user:', error);
+        } catch (error: any) {
+            console.error('Error adding user:', error);
             toast({
                 title: "Erro ao adicionar usuário",
+                description: error.message || "Tente novamente.",
                 variant: "destructive"
             });
         } finally {
@@ -118,10 +154,19 @@ export const AdminUserManagement = () => {
                 <Card className="md:col-span-1 border-primary/20 h-fit">
                     <CardHeader>
                         <CardTitle>Adicionar Novo Usuário</CardTitle>
-                        <CardDescription>Libere o acesso para um novo aluno, mentor ou administrador.</CardDescription>
+                        <CardDescription>Crie uma conta ou libere acesso para um email.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleInvite} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Nome (Opcional)</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Nome completo"
+                                    value={newName}
+                                    onChange={e => setNewName(e.target.value)}
+                                />
+                            </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Email</label>
                                 <Input
@@ -131,6 +176,17 @@ export const AdminUserManagement = () => {
                                     onChange={e => setNewEmail(e.target.value)}
                                     required
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Senha Inicial (Opcional)</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Deixe vazio para apenas liberar acesso"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    minLength={6}
+                                />
+                                <p className="text-xs text-muted-foreground">Se preenchido, o usuário será criado imediatamente.</p>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Função</label>
@@ -147,7 +203,7 @@ export const AdminUserManagement = () => {
                             </div>
                             <Button type="submit" className="w-full" disabled={inviteLoading}>
                                 {inviteLoading ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                                Adicionar Permissão
+                                {newPassword ? "Criar Usuário" : "Adicionar Permissão"}
                             </Button>
                         </form>
                     </CardContent>

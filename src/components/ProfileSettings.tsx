@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { User, Save } from 'lucide-react';
+import { User, Save, Lock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,13 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
   const [targetSpecialty, setTargetSpecialty] = useState(profile?.target_specialty || '');
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string>('');
+
+  // Password Change State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     return () => {
@@ -122,6 +130,64 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
     setTargetSpecialty(profile?.target_specialty || '');
     setIsEditing(false);
     setError('');
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError('');
+
+    if (newPassword.length < 6) {
+      setPasswordError('A nova senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('A confirmação da senha não coincide.');
+      return;
+    }
+    if (!currentPassword) {
+      setPasswordError('Por favor, digite sua senha atual.');
+      return;
+    }
+
+    try {
+      if (!userEmail) throw new Error("Email do usuário não encontrado.");
+
+      // 1. Verify current password by signing in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        setPasswordError('Senha atual incorreta.');
+        return;
+      }
+
+      // 2. Update password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Senha alterada com sucesso!",
+        description: "Use sua nova senha no próximo login."
+      });
+
+      // Reset fields
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setIsChangingPassword(false);
+
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      toast({
+        title: "Erro ao alterar senha",
+        description: error.message || "Tente novamente mais tarde.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -304,7 +370,82 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
           </div>
         </CardContent>
       </Card>
-    </div>
+
+      {/* Alterar Senha */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5" />
+            Segurança
+          </CardTitle>
+          <CardDescription>
+            Atualize sua senha de acesso
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!isChangingPassword ? (
+            <Button variant="outline" onClick={() => setIsChangingPassword(true)}>
+              Alterar Senha
+            </Button>
+          ) : (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Senha Atual</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Digite sua senha atual"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">Nova Senha</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmNewPassword">Confirmar Nova Senha</Label>
+                  <Input
+                    id="confirmNewPassword"
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    placeholder="Repita a nova senha"
+                  />
+                </div>
+              </div>
+
+              {passwordError && (
+                <p className="text-sm text-destructive font-medium">{passwordError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <Button onClick={handleChangePassword}>
+                  Salvar Nova Senha
+                </Button>
+                <Button variant="ghost" onClick={() => {
+                  setIsChangingPassword(false);
+                  setPasswordError('');
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmNewPassword('');
+                }}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+    </div >
 
   );
 }

@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_whitelist: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          role?: string
+        }
+        Relationships: []
+      }
       burnout_checkins: {
         Row: {
           created_at: string | null
@@ -776,6 +797,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      admin_create_user: {
+        Args: {
+          new_email: string
+          new_password?: string
+          new_role: string
+          new_name?: string
+        }
+        Returns: Json
+      }
       is_user_frozen: { Args: { check_user_id: string }; Returns: boolean }
       validate_invite_code: { Args: { code_input: string }; Returns: boolean }
       book_meeting: {
@@ -784,7 +814,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "mentor" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
