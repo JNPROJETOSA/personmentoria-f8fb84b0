@@ -28,7 +28,8 @@ export function useClasses(userId: string | undefined) {
           area: c.specialty as any,
           date: c.date,
           studied: c.studied,
-          priority: c.priority as 1 | 2 | 3
+          priority: c.priority as 1 | 2 | 3,
+          studied_date: c.studied_date || undefined
         }));
         setClasses(mapped);
       }
@@ -71,12 +72,24 @@ export function useClasses(userId: string | undefined) {
   const updateClass = async (id: string, updates: Partial<ClassItem>) => {
     if (!userId) return;
 
+    // Encontrar a aula atual para verificar se já estava estudada
+    const currentClass = classes.find(c => c.id === id);
+
     const dbUpdates: any = {};
     if (updates.title) dbUpdates.title = updates.title;
     if (updates.area) dbUpdates.specialty = updates.area;
     if (updates.date) dbUpdates.date = updates.date;
     if (updates.priority) dbUpdates.priority = updates.priority;
-    if (updates.studied !== undefined) dbUpdates.studied = updates.studied;
+    if (updates.studied !== undefined) {
+      dbUpdates.studied = updates.studied;
+
+      // Se está marcando como estudada pela primeira vez, salvar a data de estudo
+      if (updates.studied && currentClass && !currentClass.studied) {
+        const now = new Date().toISOString();
+        dbUpdates.studied_date = now;
+        updates.studied_date = now; // Adicionar ao update local também
+      }
+    }
 
     const { error } = await supabase
       .from('classes')

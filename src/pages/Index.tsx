@@ -161,12 +161,15 @@ const AuthenticatedApp = () => {
         const topicNorm = c.title.toLowerCase();
         topicPriorityMap.set(topicNorm, c.priority);
 
-        if (c.studied && c.date) {
-          // Initializing with class study date
+        // Usar studied_date se existir, caso contrário usar date (compatibilidade com dados antigos)
+        if (c.studied && (c.studied_date || c.date)) {
+          // A data de referência para revisões é studied_date (quando estudou) não date (quando cadastrou)
+          const studyDate = c.studied_date || c.date;
+
           reviewMap.set(topicNorm, {
             topic: c.title,
             area: c.area,
-            lastDate: c.date,
+            lastDate: studyDate,
             accuracy: 0, // No accuracy for just reading
             priority: c.priority
           });
@@ -199,7 +202,7 @@ const AuthenticatedApp = () => {
       const lastTime = new Date(data.lastDate).getTime();
       let earliestDue: any = null;
 
-      // Check intervals in order (1, 7, 14, 30)
+      // Check intervals in order (7, 14, 30, 30)
       // We want to find the *first* interval that is due and not yet done
       for (const interval of REVIEW_INTERVALS) {
         const reviewTime = lastTime + (interval * 24 * 60 * 60 * 1000);

@@ -8,7 +8,7 @@ export const AREA_COLORS: Record<MedicalArea, string> = {
   [MedicalArea.PREVENTIVA]: '#A855F7', // Purple
 };
 
-export const REVIEW_INTERVALS = [1, 7, 14, 30];
+export const REVIEW_INTERVALS = [7, 14, 30, 30];
 
 // Código de segurança para novos cadastros
 export const REGISTRATION_CODE = 'PERRY2024';

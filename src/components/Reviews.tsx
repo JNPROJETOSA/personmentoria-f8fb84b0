@@ -79,7 +79,7 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
             Sistema de Revisões Espaçadas
           </CardTitle>
           <CardDescription>
-            Algoritmo de repetição automática: 1, 7, 14 e 30 dias após a prática
+            Algoritmo de repetição automática: 7, 14, 30 e 30 dias após a prática
           </CardDescription>
         </CardHeader>
       </Card>
@@ -163,7 +163,7 @@ export default function Reviews({ reviews, onMarkReviewed, manualReviews }: Revi
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>
-                <strong className="text-foreground">Repetição Espaçada:</strong> Cada tópico que você pratica gera revisões automáticas após 1, 7, 14 e 30 dias.
+                <strong className="text-foreground">Repetição Espaçada:</strong> Cada tópico que você pratica gera revisões automáticas após 7, 14, 30 e 30 dias.
               </p>
               <p>
                 <strong className="text-foreground">Priorização:</strong> Tópicos com alta prioridade (baseada nas aulas cadastradas) aparecem primeiro.

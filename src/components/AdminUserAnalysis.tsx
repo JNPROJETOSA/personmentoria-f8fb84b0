@@ -291,6 +291,18 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
   const uniqueTopics = new Set(filteredExercises.map(ex => ex.topic)).size;
   const classesStudied = filteredClasses.filter(c => c.studied).length;
 
+  // Additional indicators - Flashcards created in period
+  const flashcardsCreated = data.flashcards.filter(fc => {
+    const createdDate = new Date(fc.created_at);
+    return createdDate >= new Date(startDate) && createdDate <= new Date(endDate);
+  }).length;
+
+  // Additional indicators - Reviews scheduled in period
+  const scheduledReviews = data.reviews.filter(rev => {
+    const dueDate = new Date(rev.due_date);
+    return dueDate >= new Date(startDate) && dueDate <= new Date(endDate);
+  }).length;
+
   // Performance by area
   const areaStats = Object.values(MedicalArea).map(area => {
     const areaExercises = filteredExercises.filter(ex => ex.specialty === area);
@@ -661,7 +673,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total de Questões</CardDescription>
@@ -703,6 +715,24 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
             <CardTitle className="text-3xl flex items-center gap-2">
               <Trophy className="w-6 h-6 text-amber-500" />
               {classesStudied}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Flashcards Criados</CardDescription>
+            <CardTitle className="text-3xl flex items-center gap-2">
+              <FileText className="w-6 h-6 text-purple-500" />
+              {flashcardsCreated}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Revisões Agendadas</CardDescription>
+            <CardTitle className="text-3xl flex items-center gap-2">
+              <CalendarDays className="w-6 h-6 text-indigo-500" />
+              {scheduledReviews}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -1010,11 +1040,13 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
 
       {/* Tabs for detailed data */}
       <Tabs defaultValue="areas" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="areas">Por Área</TabsTrigger>
           <TabsTrigger value="topics">Por Tema</TabsTrigger>
           <TabsTrigger value="exams">Provas</TabsTrigger>
           <TabsTrigger value="classes">Aulas</TabsTrigger>
+          <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+          <TabsTrigger value="reviews">Revisões</TabsTrigger>
         </TabsList>
 
         {/* Performance by Area */}
@@ -1204,29 +1236,118 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
 
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Flashcards Criados</CardDescription>
-            <CardTitle className="text-2xl">{data.flashcards.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Revisões Agendadas</CardDescription>
-            <CardTitle className="text-2xl">{data.reviews.filter(r => !r.completed).length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Tópicos Concluídos (Editorial)</CardDescription>
-            <CardTitle className="text-2xl">{data.editorialProgress.filter(e => e.status === 'mastered').length}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+        {/* Flashcards Tab */}
+        <TabsContent value="flashcards">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Flashcards Criados no Período
+              </CardTitle>
+              <CardDescription>
+                {flashcardsCreated} flashcards criados
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {flashcardsCreated > 0 ? (
+                <ScrollArea className="h-[400px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Área</TableHead>
+                        <TableHead>Frente</TableHead>
+                        <TableHead>Verso</TableHead>
+                        <TableHead className="text-center">Data de Criação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.flashcards
+                        .filter(fc => {
+                          const createdDate = new Date(fc.created_at);
+                          return createdDate >= new Date(startDate) && createdDate <= new Date(endDate);
+                        })
+                        .map((fc) => (
+                          <TableRow key={fc.id}>
+                            <TableCell className="font-medium">{fc.area}</TableCell>
+                            <TableCell className="max-w-xs truncate">{fc.front}</TableCell>
+                            <TableCell className="max-w-xs truncate">{fc.back}</TableCell>
+                            <TableCell className="text-center">
+                              {new Date(fc.created_at).toLocaleDateString('pt-BR')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">Nenhum flashcard criado no período</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Reviews Tab */}
+        <TabsContent value="reviews">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="w-5 h-5" />
+                Revisões Agendadas no Período
+              </CardTitle>
+              <CardDescription>
+                {scheduledReviews} revisões agendadas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {scheduledReviews > 0 ? (
+                <ScrollArea className="h-[400px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tópico</TableHead>
+                        <TableHead>Área</TableHead>
+                        <TableHead className="text-center">Data de Revisão</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-center">Prioridade</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.reviews
+                        .filter(rev => {
+                          const dueDate = new Date(rev.due_date);
+                          return dueDate >= new Date(startDate) && dueDate <= new Date(endDate);
+                        })
+                        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+                        .map((rev) => (
+                          <TableRow key={rev.id}>
+                            <TableCell className="font-medium">{rev.topic}</TableCell>
+                            <TableCell>{rev.area}</TableCell>
+                            <TableCell className="text-center">
+                              {new Date(rev.due_date).toLocaleDateString('pt-BR')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={rev.status === 'completed' ? 'default' : 'secondary'}>
+                                {rev.status === 'completed' ? 'Concluída' : 'Pendente'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={rev.priority === 1 ? 'destructive' : rev.priority === 2 ? 'secondary' : 'outline'}>
+                                {rev.priority === 1 ? 'Alta' : rev.priority === 2 ? 'Média' : 'Baixa'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">Nenhuma revisão agendada no período</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

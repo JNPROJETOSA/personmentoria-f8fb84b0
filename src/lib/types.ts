@@ -49,6 +49,7 @@ export interface ClassItem {
   date: string;
   studied: boolean;
   priority: 1 | 2 | 3; // 1 = High, 2 = Medium, 3 = Low
+  studied_date?: string; // Data em que foi marcada como estudada
 }
 
 export interface ExerciseLog {
