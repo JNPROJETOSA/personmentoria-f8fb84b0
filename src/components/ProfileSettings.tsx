@@ -1,11 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
-import { User, Save, Lock } from 'lucide-react';
+import { User, Save, Lock, Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { z } from 'zod';
 
 
@@ -49,6 +59,13 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+
+  // Reset Records State
+  const [isResettingRecords, setIsResettingRecords] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [isProcessingReset, setIsProcessingReset] = useState(false);
+  const [resetError, setResetError] = useState('');
 
   useEffect(() => {
     return () => {
@@ -187,6 +204,84 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
         description: error.message || "Tente novamente mais tarde.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleResetRecords = async () => {
+    setResetError('');
+
+    if (!resetPassword) {
+      setResetError('Por favor, digite sua senha para confirmar.');
+      return;
+    }
+
+    try {
+      if (!userEmail) throw new Error("Email do usuário não encontrado.");
+
+      // 1. Verify password by signing in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: resetPassword,
+      });
+
+      if (signInError) {
+        setResetError('Senha incorreta. Verifique e tente novamente.');
+        return;
+      }
+
+      // 2. Show final confirmation dialog
+      setShowResetConfirmation(true);
+
+    } catch (error: any) {
+      console.error('Reset validation error:', error);
+      setResetError(error.message || 'Erro ao validar senha.');
+    }
+  };
+
+  const confirmResetRecords = async () => {
+    setIsProcessingReset(true);
+    setShowResetConfirmation(false);
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não encontrado');
+
+      // Call the reset function
+      const { data, error } = await supabase.rpc('reset_user_records', {
+        target_user_id: user.id
+      });
+
+      if (error) throw error;
+
+      if (data?.success === false) {
+        throw new Error(data.error || 'Erro ao resetar registros');
+      }
+
+      // Success!
+      toast({
+        title: "Registros resetados com sucesso!",
+        description: "Todos os seus dados de estudo foram apagados. A página será recarregada.",
+      });
+
+      // Reset form
+      setResetPassword('');
+      setIsResettingRecords(false);
+      setResetError('');
+
+      // Reload page after 2 seconds to reflect changes
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Reset records error:', error);
+      toast({
+        title: "Erro ao resetar registros",
+        description: error.message || "Ocorreu um erro. Tente novamente mais tarde.",
+        variant: "destructive"
+      });
+      setIsProcessingReset(false);
     }
   };
 
@@ -444,6 +539,136 @@ export default function ProfileSettings({ profile, updateProfile, userEmail }: P
           )}
         </CardContent>
       </Card>
+
+      {/* Resetar Registros */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="w-5 h-5" />
+            Resetar Registros
+          </CardTitle>
+          <CardDescription>
+            Apagar permanentemente todo o histórico de estudos
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!isResettingRecords ? (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+                <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-destructive-foreground">
+                  <p className="font-semibold mb-1">Atenção: Esta ação é irreversível!</p>
+                  <p className="text-muted-foreground">
+                    Ao resetar seus registros, você perderá permanentemente todos os dados de progresso:
+                    aulas estudadas, exercícios, simulados, revisões, flashcards, caderno de erros, editais e estatísticas.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => setIsResettingRecords(true)}
+                className="w-full"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Resetar Todos os Registros
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-2">
+                <Label htmlFor="resetPassword">Digite sua senha para confirmar</Label>
+                <Input
+                  id="resetPassword"
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="Sua senha"
+                  disabled={isProcessingReset}
+                />
+              </div>
+
+              <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+                <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">
+                  Esta ação irá apagar <strong>PERMANENTEMENTE</strong> todos os seus registros de estudo.
+                  Seus dados pessoais (nome, email, instituições) serão mantidos.
+                </p>
+              </div>
+
+              {resetError && (
+                <p className="text-sm text-destructive font-medium">{resetError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  onClick={handleResetRecords}
+                  disabled={isProcessingReset}
+                  className="flex-1"
+                >
+                  {isProcessingReset ? 'Processando...' : 'Confirmar Reset'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsResettingRecords(false);
+                    setResetPassword('');
+                    setResetError('');
+                  }}
+                  disabled={isProcessingReset}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Reset Confirmation Dialog */}
+      <AlertDialog open={showResetConfirmation} onOpenChange={setShowResetConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Tem certeza absoluta?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Você está prestes a <strong>APAGAR PERMANENTEMENTE</strong> todos os seus dados de estudo.
+                Esta ação <strong>NÃO PODE SER DESFEITA</strong>.
+              </p>
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-sm font-semibold mb-2">Será apagado:</p>
+                <ul className="text-sm space-y-1 list-disc list-inside">
+                  <li>Todas as aulas marcadas como estudadas</li>
+                  <li>Todos os registros de exercícios e simulados</li>
+                  <li>Todas as revisões agendadas</li>
+                  <li>Todos os flashcards e pastas</li>
+                  <li>Todo o caderno de erros</li>
+                  <li>Todos os editais e progresso</li>
+                  <li>Todas as sessões do modo prova</li>
+                  <li>Todo o histórico de burnout</li>
+                  <li>Seu XP, nível e sequência de estudos</li>
+                </ul>
+              </div>
+              <p className="text-sm">
+                <strong>Será mantido:</strong> Seus dados pessoais (nome, email, instituições) e metas de estudo.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessingReset}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmResetRecords}
+              disabled={isProcessingReset}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isProcessingReset ? 'Resetando...' : 'Sim, resetar tudo'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div >
 
