@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Plus, X, Edit2, Check, Trash2 } from 'lucide-react';
+import { Calendar, Plus, X, Edit2, Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWeeklyAgenda } from '@/hooks/useWeeklyAgenda';
-import { format, addDays, startOfWeek } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -58,6 +58,9 @@ const serializeTask = (block: Omit<TimeBlock, 'originalIndex' | 'isCompleted'>):
 };
 
 export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps) {
+  const MAX_WEEKS_BACK = 12;
+  const MAX_WEEKS_FORWARD = 12;
+
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const { agenda, loading, updateDayTasks, toggleTaskCompletion } = useWeeklyAgenda(userId, currentWeekOffset);
   const [editingDay, setEditingDay] = useState<number | null>(null);
@@ -73,8 +76,37 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
   const [editingTaskStart, setEditingTaskStart] = useState('');
   const [editingTaskEnd, setEditingTaskEnd] = useState('');
 
-  const weekStart = startOfWeek(addDays(new Date(), currentWeekOffset * 7), { weekStartsOn: 0 });
+  const weekStart = startOfWeek(addWeeks(new Date(), currentWeekOffset), { weekStartsOn: 0 });
+  const weekEnd = addDays(weekStart, 6);
   const today = new Date().getDay();
+
+  // Navigation functions
+  const goToPreviousWeek = () => {
+    if (currentWeekOffset > -MAX_WEEKS_BACK) {
+      setCurrentWeekOffset(prev => prev - 1);
+    }
+  };
+
+  const goToNextWeek = () => {
+    if (currentWeekOffset < MAX_WEEKS_FORWARD) {
+      setCurrentWeekOffset(prev => prev + 1);
+    }
+  };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeekOffset(0);
+  };
+
+  // Week label
+  const getWeekLabel = () => {
+    if (currentWeekOffset === 0) return "Semana Atual";
+    if (currentWeekOffset === -1) return "Semana Passada";
+    if (currentWeekOffset === 1) return "Próxima Semana";
+    if (currentWeekOffset < 0) return `${Math.abs(currentWeekOffset)} semanas atrás`;
+    return `Daqui ${currentWeekOffset} semanas`;
+  };
+
+  const weekRangeLabel = `${format(weekStart, 'dd/MM')} - ${format(weekEnd, 'dd/MM')}`;
 
   const getNextTimeSlot = (tasks: string[]) => {
     if (tasks.length === 0) return { start: '08:00', end: '09:00' };
@@ -184,44 +216,65 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
       </div>
 
       <CardHeader className="pb-2">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Agenda da Semana
-              {isAdminView && (
-                <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full ml-2">
-                  Modo Mentor
-                </span>
-              )}
-            </CardTitle>
-            <p className="text-sm text-slate-400">
-              Semana de {format(weekStart, "dd 'de' MMMM", { locale: ptBR })}
-            </p>
+        <div className="flex flex-col gap-4">
+          {/* Title and Week Info */}
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Agenda da Semana
+                {isAdminView && (
+                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full ml-2">
+                    Modo Mentor
+                  </span>
+                )}
+              </CardTitle>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-sm font-medium text-primary">
+                  {getWeekLabel()}
+                </p>
+                <span className="text-slate-500">•</span>
+                <p className="text-sm text-slate-400">
+                  {weekRangeLabel}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex bg-slate-950/50 p-1 rounded-lg border border-white/10 w-full md:w-auto self-end relative z-10">
+          {/* Navigation Controls */}
+          <div className="flex items-center justify-between gap-3">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => setCurrentWeekOffset(0)}
-              className={`flex-1 md:flex-none h-8 px-4 rounded-md transition-all ${currentWeekOffset === 0
-                ? "bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary/90"
-                : "text-slate-400 hover:text-white hover:bg-white/10"
-                }`}
+              onClick={goToPreviousWeek}
+              disabled={currentWeekOffset <= -MAX_WEEKS_BACK}
+              className="h-9 px-3 bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              Semana Atual
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
             </Button>
+
+            {currentWeekOffset !== 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={goToCurrentWeek}
+                className="h-9 px-4 bg-primary hover:bg-primary/90 text-black font-medium"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Semana Atual
+              </Button>
+            )}
+
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => setCurrentWeekOffset(1)}
-              className={`flex-1 md:flex-none h-8 px-4 rounded-md transition-all ${currentWeekOffset === 1
-                ? "bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary/90"
-                : "text-slate-400 hover:text-white hover:bg-white/10"
-                }`}
+              onClick={goToNextWeek}
+              disabled={currentWeekOffset >= MAX_WEEKS_FORWARD}
+              className="h-9 px-3 bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              Próxima Semana
+              Próxima
+              <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
         </div>

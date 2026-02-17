@@ -14,6 +14,7 @@ export interface Flashcard {
   area: MedicalArea;
   front: string;
   back: string;
+  front_image_url?: string | null;
   answer_image_url?: string | null;
   folderId: string | null;
   difficulty: 'easy' | 'medium' | 'hard' | null;

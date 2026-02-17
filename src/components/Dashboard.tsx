@@ -10,6 +10,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useStudyStrategy } from '@/hooks/useStudyStrategy';
+import { useStudyActivityLog } from '@/hooks/useStudyActivityLog';
+import { isInCurrentWeek, formatWeekRange } from '@/lib/dateUtils';
 import { ExerciseLog, ClassItem, ReviewItem, Goals, UserProgress, MedicalArea } from '@/lib/types';
 import { AREA_COLORS, RPG_LEVELS } from '@/lib/constants';
 import { getPerformanceColor } from '@/lib/utils';
@@ -49,17 +51,16 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
   const [tempGoals, setTempGoals] = useState(goals);
   const { notifications, markAsRead } = useNotifications(userId);
   const { strategy } = useStudyStrategy(userId);
+  const { getDailyActivitySummary, streak } = useStudyActivityLog(userId);
 
-  const last7Days = exercises.filter(ex => {
-    const diff = Date.now() - new Date(ex.date).getTime();
-    return diff <= 7 * 24 * 60 * 60 * 1000;
-  });
+  // Filter exercises for CURRENT WEEK (Monday-Sunday), not rolling 7 days
+  const currentWeekExercises = exercises.filter(ex => isInCurrentWeek(ex.date));
 
-  const weeklyQuestions = last7Days.reduce((sum, ex) => sum + ex.totalQuestions, 0);
-  const weeklyCorrect = last7Days.reduce((sum, ex) => sum + ex.correctAnswers, 0);
+  const weeklyQuestions = currentWeekExercises.reduce((sum, ex) => sum + ex.totalQuestions, 0);
+  const weeklyCorrect = currentWeekExercises.reduce((sum, ex) => sum + ex.correctAnswers, 0);
   const weeklyAccuracy = weeklyQuestions > 0 ? (weeklyCorrect / weeklyQuestions) * 100 : 0;
 
-  const uniqueTopics = new Set(last7Days.map(ex => ex.topic)).size;
+  const uniqueTopics = new Set(currentWeekExercises.map(ex => ex.topic)).size;
   const studiedClasses = classes.filter(c => c.studied).length;
 
   const levelInfo = getLevelInfo(userProgress.xp);
@@ -80,21 +81,11 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
     return stats;
   }, [exercises]);
 
-  // Heatmap data (last 180 days)
+  // Heatmap data (last 180 days) - NOW using study_activity_log
   const heatmapData = useMemo(() => {
-    const days: { date: string; count: number }[] = [];
-    const today = new Date();
-
-    for (let i = 179; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      const count = exercises.filter(ex => ex.date === dateStr).reduce((sum, ex) => sum + ex.totalQuestions, 0);
-      days.push({ date: dateStr, count });
-    }
-
-    return days;
-  }, [exercises]);
+    const activitySummary = getDailyActivitySummary(180);
+    return activitySummary;
+  }, [getDailyActivitySummary]);
 
   const maxCount = Math.max(...heatmapData.map(d => d.count), 1);
 
@@ -242,7 +233,7 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20">
                 <Flame className="w-6 h-6 text-orange-500 animate-pulse" />
                 <div>
-                  <div className="text-2xl font-black">{userProgress.streak}</div>
+                  <div className="text-2xl font-black">{streak.currentStreak}</div>
                   <div className="text-xs text-muted-foreground">dias</div>
                 </div>
               </div>
@@ -271,7 +262,10 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
         <div className="relative z-10 flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Target className="w-6 h-6 text-brand-accent" />
-            <h2 className="text-2xl font-bold text-white">Metas da Semana</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Metas da Semana</h2>
+              <p className="text-xs text-white/60 mt-0.5">{formatWeekRange()}</p>
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -428,19 +422,20 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
               {heatmapData.map((day, i) => {
                 let color = 'bg-slate-100 dark:bg-slate-800';
                 if (day.count > 0) {
-                  if (day.count >= 50) color = 'bg-brand-teal';
-                  else if (day.count >= 11) color = 'bg-teal-300';
+                  // Color based on number of different activity types (more variety = darker green)
+                  if (day.count >= 4) color = 'bg-brand-teal';
+                  else if (day.count >= 2) color = 'bg-teal-400';
                   else if (day.count >= 1) color = 'bg-teal-200';
                 }
                 return (
                   <div
                     key={i}
                     className={`w-3 h-3 md:w-4 md:h-4 rounded-sm ${color} hover:ring-2 hover:ring-brand-accent transition-all cursor-pointer relative group`}
-                    title={`${day.date}: ${day.count} questões`}
+                    title={`${day.date}: ${day.count} atividades`}
                   >
                     {/* Tooltip */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                      {new Date(day.date).toLocaleDateString('pt-BR')}: {day.count} questões
+                      {new Date(day.date).toLocaleDateString('pt-BR')}: {day.count} atividade{day.count !== 1 ? 's' : ''}
                       <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900" />
                     </div>
                   </div>
@@ -452,10 +447,10 @@ export default function Dashboard({ exercises, classes, pendingReviews, goals, s
             <div className="flex items-center gap-3 mt-6 text-xs text-muted-foreground">
               <span className="font-medium">Menos</span>
               <div className="flex gap-1">
-                <div className="w-4 h-4 rounded-sm bg-slate-100 dark:bg-slate-800 border border-border" title="Sem estudo" />
-                <div className="w-4 h-4 rounded-sm bg-teal-200" title="1-10 questões" />
-                <div className="w-4 h-4 rounded-sm bg-teal-300" title="11-30 questões" />
-                <div className="w-4 h-4 rounded-sm bg-brand-teal" title="50+ questões (Meta batida!)" />
+                <div className="w-4 h-4 rounded-sm bg-slate-100 dark:bg-slate-800 border border-border" title="Sem atividade" />
+                <div className="w-4 h-4 rounded-sm bg-teal-200" title="1 atividade" />
+                <div className="w-4 h-4 rounded-sm bg-teal-400" title="2-3 atividades" />
+                <div className="w-4 h-4 rounded-sm bg-brand-teal" title="4+ atividades diferentes" />
               </div>
               <span className="font-medium">Mais</span>
             </div>

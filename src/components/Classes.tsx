@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ClassItem, MedicalArea } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
+import { getLocalDateString } from '@/lib/dateUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface ClassesProps {
@@ -22,7 +23,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
   const [newClass, setNewClass] = useState<Partial<ClassItem>>({
     title: '',
     area: MedicalArea.CLINICA,
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     studied: false,
     priority: 2
   });
@@ -62,7 +63,7 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
     setNewClass({
       title: '',
       area: MedicalArea.CLINICA,
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       studied: false,
       priority: 2
     });
@@ -114,8 +115,8 @@ export default function Classes({ classes, addClass, updateClass, deleteClass }:
   const ClassCard = ({ cls, isStudied }: { cls: ClassItem; isStudied: boolean }) => (
     <div
       className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${isStudied
-          ? 'bg-muted/50 border-muted'
-          : 'bg-card hover:bg-accent/50'
+        ? 'bg-muted/50 border-muted'
+        : 'bg-card hover:bg-accent/50'
         }`}
     >
       <Button

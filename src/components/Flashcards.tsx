@@ -26,7 +26,7 @@ interface FlashcardsProps {
   folders: FlashcardFolder[];
   addFlashcard: (flashcard: Omit<Flashcard, 'id' | 'difficulty' | 'lastReviewed' | 'nextReview' | 'reviewCount'>) => Promise<void>;
   deleteFlashcard: (id: string) => Promise<void>;
-  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string; answer_image_url?: string | null; folderId?: string | null }) => Promise<void>;
+  updateFlashcard: (id: string, updates: { area?: string; front?: string; back?: string; front_image_url?: string | null; answer_image_url?: string | null; folderId?: string | null }) => Promise<void>;
   addFolder: (folder: { area: MedicalArea; name: string }) => Promise<FlashcardFolder | null>;
   updateFolder: (id: string, updates: { name?: string }) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
@@ -115,8 +115,14 @@ export default function Flashcards({
   const { uploadImage, getImageUrl, deleteImage, uploading } = useFlashcardImages();
   const [newCardImage, setNewCardImage] = useState<File | null>(null);
   const [newCardImagePreview, setNewCardImagePreview] = useState<string | null>(null);
+  const [newCardFrontImage, setNewCardFrontImage] = useState<File | null>(null);
+  const [newCardFrontImagePreview, setNewCardFrontImagePreview] = useState<string | null>(null);
   const [editCardImage, setEditCardImage] = useState<File | null>(null);
   const [editCardImagePreview, setEditCardImagePreview] = useState<string | null>(null);
+  const [editCardFrontImage, setEditCardFrontImage] = useState<File | null>(null);
+  const [editCardFrontImagePreview, setEditCardFrontImagePreview] = useState<string | null>(null);
+  const [removeBackImage, setRemoveBackImage] = useState(false);
+  const [removeFrontImage, setRemoveFrontImage] = useState(false);
 
   const [activeTab, setActiveTab] = useState("cards");
 
@@ -154,6 +160,32 @@ export default function Flashcards({
       const reader = new FileReader();
       reader.onloadend = () => {
         setEditCardImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle FRONT image file selection for new card
+  const handleNewCardFrontImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewCardFrontImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewCardFrontImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle FRONT image file selection for edit card
+  const handleEditCardFrontImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditCardFrontImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditCardFrontImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -250,8 +282,18 @@ export default function Flashcards({
     }
 
     let imageUrl: string | null = null;
+    let frontImageUrl: string | null = null;
 
-    // Upload image if selected
+    // Upload front image if selected
+    if (newCardFrontImage) {
+      frontImageUrl = await uploadImage(newCardFrontImage);
+      if (!frontImageUrl) {
+        // Upload failed, toast already shown by hook
+        return;
+      }
+    }
+
+    // Upload back image if selected
     if (newCardImage) {
       imageUrl = await uploadImage(newCardImage);
       if (!imageUrl) {
@@ -264,6 +306,7 @@ export default function Flashcards({
       area: newCard.area,
       front: newCard.front,
       back: newCard.back,
+      front_image_url: frontImageUrl,
       answer_image_url: imageUrl,
       folderId: newCard.folderId,
       type: newCard.type
@@ -274,11 +317,13 @@ export default function Flashcards({
     setNewCard({ area: MedicalArea.PEDIATRIA, front: '', back: '', folderId: null, type: 'standard' });
     setNewCardImage(null);
     setNewCardImagePreview(null);
+    setNewCardFrontImage(null);
+    setNewCardFrontImagePreview(null);
     setIsCreating(false);
 
     toast({
       title: "Flashcard criado!",
-      description: imageUrl ? "Card com imagem adicionado" : "Card adicionado com sucesso"
+      description: (frontImageUrl || imageUrl) ? "Card com imagem adicionado" : "Card adicionado com sucesso"
     });
   };
 
@@ -318,13 +363,24 @@ export default function Flashcards({
       back: card.back
     });
     setEditCardImage(null);
+    setEditCardFrontImage(null);
+    setRemoveBackImage(false);
+    setRemoveFrontImage(false);
 
-    // Load existing image for preview if available
+    // Load existing back image for preview if available
     if (card.answer_image_url) {
       const url = await getImageUrl(card.answer_image_url);
       setEditCardImagePreview(url);
     } else {
       setEditCardImagePreview(null);
+    }
+
+    // Load existing front image for preview if available
+    if (card.front_image_url) {
+      const url = await getImageUrl(card.front_image_url);
+      setEditCardFrontImagePreview(url);
+    } else {
+      setEditCardFrontImagePreview(null);
     }
 
     setIsEditing(card.id);
@@ -349,23 +405,46 @@ export default function Flashcards({
       return;
     }
 
-    let imageUrl: string | null | undefined = undefined;
+    const currentCard = flashcards.find(c => c.id === isEditing);
+    let backImageUrl: string | null | undefined = undefined;
+    let frontImageUrl: string | null | undefined = undefined;
 
-    // Upload new image if selected
-    if (editCardImage) {
-      const uploadedPath = await uploadImage(editCardImage);
-      if (!uploadedPath) {
-        // Upload failed
-        return;
+    // Handle FRONT image removal
+    if (removeFrontImage && currentCard?.front_image_url) {
+      await deleteImage(currentCard.front_image_url);
+      frontImageUrl = null;
+    }
+    // Handle FRONT image upload (new or replacement)
+    else if (editCardFrontImage) {
+      // Delete old front image if exists
+      if (currentCard?.front_image_url) {
+        await deleteImage(currentCard.front_image_url);
       }
+      // Upload new front image
+      const uploadedPath = await uploadImage(editCardFrontImage);
+      if (!uploadedPath) {
+        return; // Upload failed
+      }
+      frontImageUrl = uploadedPath;
+    }
 
-      // Delete old image if exists
-      const currentCard = flashcards.find(c => c.id === isEditing);
+    // Handle BACK image removal
+    if (removeBackImage && currentCard?.answer_image_url) {
+      await deleteImage(currentCard.answer_image_url);
+      backImageUrl = null;
+    }
+    // Handle BACK image upload (new or replacement)
+    else if (editCardImage) {
+      // Delete old back image if exists
       if (currentCard?.answer_image_url) {
         await deleteImage(currentCard.answer_image_url);
       }
-
-      imageUrl = uploadedPath;
+      // Upload new back image
+      const uploadedPath = await uploadImage(editCardImage);
+      if (!uploadedPath) {
+        return; // Upload failed
+      }
+      backImageUrl = uploadedPath;
     }
 
     const updates: any = {
@@ -374,8 +453,12 @@ export default function Flashcards({
       back: editCard.back,
     };
 
-    if (imageUrl !== undefined) {
-      updates.answer_image_url = imageUrl;
+    if (frontImageUrl !== undefined) {
+      updates.front_image_url = frontImageUrl;
+    }
+
+    if (backImageUrl !== undefined) {
+      updates.answer_image_url = backImageUrl;
     }
 
     await updateFlashcard(isEditing, updates);
@@ -385,6 +468,10 @@ export default function Flashcards({
     setIsEditing(null);
     setEditCardImage(null);
     setEditCardImagePreview(null);
+    setEditCardFrontImage(null);
+    setEditCardFrontImagePreview(null);
+    setRemoveBackImage(false);
+    setRemoveFrontImage(false);
 
     toast({
       title: "Flashcard atualizado!",
@@ -526,7 +613,7 @@ export default function Flashcards({
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* FRONT */}
-                <Card className="absolute inset-0 backface-hidden flex items-center justify-center p-8 bg-card border-2">
+                <Card className="absolute inset-0 backface-hidden flex flex-col items-center justify-center p-8 bg-card border-2 overflow-auto">
                   {card.type === 'cloze' ? (
                     <p className="text-xl text-center leading-relaxed font-medium">
                       {card.front.split(/({{[^}]+}})/g).map((part, i) =>
@@ -538,6 +625,13 @@ export default function Flashcards({
                     </p>
                   ) : (
                     <p className="text-xl text-center font-medium">{card.front}</p>
+                  )}
+
+                  {/* Display front image if available */}
+                  {card.front_image_url && (
+                    <div className="mt-4">
+                      <FlashcardImage imagePath={card.front_image_url} getImageUrl={getImageUrl} />
+                    </div>
                   )}
                 </Card>
 
@@ -762,6 +856,38 @@ export default function Flashcards({
                             rows={3}
                           />
                         </div>
+
+                        {/* FRONT Image Upload */}
+                        <div className="space-y-2">
+                          <Label>Imagem da Pergunta (opcional, max 200KB)</Label>
+                          <Input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleNewCardFrontImageChange}
+                            disabled={uploading}
+                          />
+                          {newCardFrontImagePreview && (
+                            <div className="relative mt-2">
+                              <img
+                                src={newCardFrontImagePreview}
+                                alt="Preview"
+                                className="max-h-40 rounded border"
+                              />
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-1 right-1"
+                                onClick={() => {
+                                  setNewCardFrontImage(null);
+                                  setNewCardFrontImagePreview(null);
+                                }}
+                              >
+                                Remover
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="space-y-2">
                           <Label>
                             {newCard.type === 'standard' ? 'Verso (Resposta)' : 'Notas Adicionais (Opcional)'}
@@ -775,6 +901,8 @@ export default function Flashcards({
                             rows={4}
                           />
                         </div>
+
+                        {/* BACK Image Upload */}
                         <div className="space-y-2">
                           <Label>Imagem da Resposta (opcional, max 200KB)</Label>
                           <Input
@@ -1100,6 +1228,39 @@ export default function Flashcards({
                     rows={3}
                   />
                 </div>
+
+                {/* FRONT Image Upload/Edit */}
+                <div className="space-y-2">
+                  <Label>Imagem da Pergunta (opcional, max 200KB)</Label>
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleEditCardFrontImageChange}
+                    disabled={uploading}
+                  />
+                  {editCardFrontImagePreview && !removeFrontImage && (
+                    <div className="relative mt-2">
+                      <img
+                        src={editCardFrontImagePreview}
+                        alt="Preview"
+                        className="max-h-40 rounded border"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-1 right-1"
+                        onClick={() => {
+                          setEditCardFrontImage(null);
+                          setEditCardFrontImagePreview(null);
+                          setRemoveFrontImage(true);
+                        }}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label>Verso (Resposta)</Label>
                   <Textarea
@@ -1108,6 +1269,8 @@ export default function Flashcards({
                     rows={4}
                   />
                 </div>
+
+                {/* BACK Image Upload/Edit */}
                 <div className="space-y-2">
                   <Label>Imagem da Resposta (opcional, max 200KB)</Label>
                   <Input
@@ -1116,7 +1279,7 @@ export default function Flashcards({
                     onChange={handleEditCardImageChange}
                     disabled={uploading}
                   />
-                  {editCardImagePreview && (
+                  {editCardImagePreview && !removeBackImage && (
                     <div className="relative mt-2">
                       <img
                         src={editCardImagePreview}
@@ -1130,6 +1293,7 @@ export default function Flashcards({
                         onClick={() => {
                           setEditCardImage(null);
                           setEditCardImagePreview(null);
+                          setRemoveBackImage(true);
                         }}
                       >
                         Remover

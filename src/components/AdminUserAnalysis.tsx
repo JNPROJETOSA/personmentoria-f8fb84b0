@@ -22,7 +22,7 @@ import { useStudyStrategy } from '@/hooks/useStudyStrategy';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { MedicalArea, ExamLog } from '@/lib/types';
+import { MedicalArea, ExamLog, Flashcard, Goals } from '@/lib/types';
 import { getPerformanceColor } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -30,6 +30,7 @@ import autoTable from 'jspdf-autotable';
 import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { saveAs } from 'file-saver';
+import { FlashcardDetailDialog } from '@/components/FlashcardDetailDialog';
 
 interface AdminUserAnalysisProps {
   user: UserSummary;
@@ -195,6 +196,12 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
     await saveStrategy(macroStrategy, microStrategy);
     setSavingStrategy(false);
   };
+
+  // Flashcard Viewer States
+  const [selectedFlashcard, setSelectedFlashcard] = useState<Flashcard | null>(null);
+  const [flashcardDialogOpen, setFlashcardDialogOpen] = useState(false);
+  const [flashcardSearch, setFlashcardSearch] = useState('');
+  const [flashcardAreaFilter, setFlashcardAreaFilter] = useState<'all' | MedicalArea>('all');
 
   // Sync editGoals when goals are loaded
   useEffect(() => {
@@ -1237,52 +1244,138 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           </Card>
         </TabsContent>
 
-        {/* Flashcards Tab */}
+        {/* Flashcards Tab - Enhanced with Full Viewing */}
         <TabsContent value="flashcards">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Flashcards Criados no Período
+                Flashcards do Aluno
               </CardTitle>
               <CardDescription>
-                {flashcardsCreated} flashcards criados
+                Total: {data.flashcards.length} flashcards criados
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {flashcardsCreated > 0 ? (
-                <ScrollArea className="h-[400px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Área</TableHead>
-                        <TableHead>Frente</TableHead>
-                        <TableHead>Verso</TableHead>
-                        <TableHead className="text-center">Data de Criação</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.flashcards
-                        .filter(fc => {
-                          const createdDate = new Date(fc.created_at);
-                          return createdDate >= new Date(startDate) && createdDate <= new Date(endDate);
-                        })
-                        .map((fc) => (
-                          <TableRow key={fc.id}>
-                            <TableCell className="font-medium">{fc.area}</TableCell>
-                            <TableCell className="max-w-xs truncate">{fc.front}</TableCell>
-                            <TableCell className="max-w-xs truncate">{fc.back}</TableCell>
-                            <TableCell className="text-center">
+            <CardContent className="space-y-4">
+              {/* Search and Filters */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <Input
+                    placeholder="🔍 Buscar por texto (frente ou verso)..."
+                    value={flashcardSearch}
+                    onChange={(e) => setFlashcardSearch(e.target.value)}
+                  />
+                </div>
+                <Select value={flashcardAreaFilter} onValueChange={(v) => setFlashcardAreaFilter(v as any)}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Área" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Áreas</SelectItem>
+                    {Object.values(MedicalArea).map(area => (
+                      <SelectItem key={area} value={area}>{area}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(flashcardSearch || flashcardAreaFilter !== 'all') && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setFlashcardSearch('');
+                      setFlashcardAreaFilter('all');
+                    }}
+                  >
+                    Limpar Filtros
+                  </Button>
+                )}
+              </div>
+
+              {/* Flashcards Table */}
+              {(() => {
+                // Filter flashcards
+                const filteredFlashcards = data.flashcards.filter(fc => {
+                  // Search filter
+                  const searchLower = flashcardSearch.toLowerCase();
+                  const matchesSearch = !flashcardSearch ||
+                    fc.front.toLowerCase().includes(searchLower) ||
+                    fc.back.toLowerCase().includes(searchLower);
+
+                  // Area filter
+                  const matchesArea = flashcardAreaFilter === 'all' || fc.area === flashcardAreaFilter;
+
+                  return matchesSearch && matchesArea;
+                });
+
+                return filteredFlashcards.length > 0 ? (
+                  <ScrollArea className="h-[450px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Área</TableHead>
+                          <TableHead>Frente (preview)</TableHead>
+                          <TableHead>Verso (preview)</TableHead>
+                          <TableHead className="text-center w-[130px]">Criado em</TableHead>
+                          <TableHead className="text-center w-[100px]">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredFlashcards.map((fc) => (
+                          <TableRow key={fc.id} className="hover:bg-muted/50">
+                            <TableCell>
+                              <Badge variant="outline">{fc.area}</Badge>
+                            </TableCell>
+                            <TableCell className="max-w-[250px]">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate">{fc.front}</p>
+                                {fc.front_image_url && (
+                                  <Badge variant="secondary" className="text-xs shrink-0">
+                                    📷
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-[250px]">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate">{fc.back}</p>
+                                {fc.answer_image_url && (
+                                  <Badge variant="secondary" className="text-xs shrink-0">
+                                    📷
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center text-sm text-muted-foreground">
                               {new Date(fc.created_at).toLocaleDateString('pt-BR')}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedFlashcard(fc);
+                                  setFlashcardDialogOpen(true);
+                                }}
+                                className="gap-2"
+                              >
+                                👁️ Ver
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Nenhum flashcard criado no período</p>
-              )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                ) : (
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                    <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                    <p className="text-muted-foreground">
+                      {flashcardSearch || flashcardAreaFilter !== 'all'
+                        ? 'Nenhum flashcard encontrado com os filtros aplicados'
+                        : 'Nenhum flashcard criado ainda'}
+                    </p>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1348,6 +1441,16 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Flashcard Detail Dialog */}
+      <FlashcardDetailDialog
+        flashcard={selectedFlashcard}
+        open={flashcardDialogOpen}
+        onClose={() => {
+          setFlashcardDialogOpen(false);
+          setSelectedFlashcard(null);
+        }}
+      />
     </div>
   );
 };

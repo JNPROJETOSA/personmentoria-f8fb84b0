@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ExamLog, MedicalArea } from '@/lib/types';
 import { AREA_COLORS, EXAM_INSTITUTIONS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
+import { getLocalDateString } from '@/lib/dateUtils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -39,7 +40,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
   const [newExam, setNewExam] = useState<Partial<ExamLog>>({
     name: '',
     institution: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     totalQuestions: 0,
     correctAnswers: 0,
     areas: [],
@@ -166,7 +167,7 @@ export default function Exams({ exams, addExam, deleteExam, addXP }: ExamsProps)
     setNewExam({
       name: '',
       institution: '',
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       totalQuestions: 0,
       correctAnswers: 0,
       areas: [],

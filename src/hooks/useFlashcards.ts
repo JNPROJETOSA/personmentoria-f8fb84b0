@@ -38,6 +38,7 @@ export function useFlashcards(userId: string | undefined) {
           area: f.area as any,
           front: f.front,
           back: f.back,
+          front_image_url: (f as any).front_image_url || null,
           answer_image_url: (f as any).answer_image_url || null,
           folderId: f.folder_id || null,
           difficulty: null,
@@ -63,6 +64,7 @@ export function useFlashcards(userId: string | undefined) {
         area: flashcard.area,
         front: flashcard.front,
         back: flashcard.back,
+        front_image_url: flashcard.front_image_url || null,
         answer_image_url: flashcard.answer_image_url || null,
         folder_id: flashcard.folderId || null,
         type: flashcard.type || 'standard'
@@ -81,6 +83,7 @@ export function useFlashcards(userId: string | undefined) {
         area: data.area as any,
         front: data.front,
         back: data.back,
+        front_image_url: (data as any).front_image_url || null,
         answer_image_url: (data as any).answer_image_url || null,
         folderId: data.folder_id || null,
         difficulty: null,
@@ -97,16 +100,28 @@ export function useFlashcards(userId: string | undefined) {
     // Find the flashcard to be deleted
     const flashcardToDelete = flashcards.find(f => f.id === id);
 
-    // If it has an image in our bucket, delete it from storage first
+    // Delete front image from storage if exists
+    if (flashcardToDelete && flashcardToDelete.front_image_url) {
+      if (!flashcardToDelete.front_image_url.startsWith('http')) {
+        const { error: storageError } = await supabase.storage
+          .from('flashcard-images')
+          .remove([flashcardToDelete.front_image_url]);
+
+        if (storageError) {
+          console.error('Error deleting front image file:', storageError);
+        }
+      }
+    }
+
+    // Delete back image from storage if exists
     if (flashcardToDelete && flashcardToDelete.answer_image_url) {
-      // Only delete if it's hosted in our storage (simple check, or rely on storage.remove error handling)
       if (!flashcardToDelete.answer_image_url.startsWith('http')) {
         const { error: storageError } = await supabase.storage
           .from('flashcard-images')
           .remove([flashcardToDelete.answer_image_url]);
 
         if (storageError) {
-          console.error('Error deleting flashcard image file:', storageError);
+          console.error('Error deleting back image file:', storageError);
         }
       }
     }
@@ -126,13 +141,14 @@ export function useFlashcards(userId: string | undefined) {
     }
   };
 
-  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string; answer_image_url?: string | null; folderId?: string | null }) => {
+  const updateFlashcard = async (id: string, updates: { area?: string; front?: string; back?: string; front_image_url?: string | null; answer_image_url?: string | null; folderId?: string | null }) => {
     if (!userId) return;
 
     const dbUpdates: any = {};
     if (updates.area !== undefined) dbUpdates.area = updates.area;
     if (updates.front !== undefined) dbUpdates.front = updates.front;
     if (updates.back !== undefined) dbUpdates.back = updates.back;
+    if (updates.front_image_url !== undefined) dbUpdates.front_image_url = updates.front_image_url;
     if (updates.answer_image_url !== undefined) dbUpdates.answer_image_url = updates.answer_image_url;
     if (updates.folderId !== undefined) dbUpdates.folder_id = updates.folderId;
     if ((updates as any).type !== undefined) dbUpdates.type = (updates as any).type;
@@ -155,6 +171,7 @@ export function useFlashcards(userId: string | undefined) {
             area: (updates.area || f.area) as any,
             front: updates.front !== undefined ? updates.front : f.front,
             back: updates.back !== undefined ? updates.back : f.back,
+            front_image_url: updates.front_image_url !== undefined ? updates.front_image_url : f.front_image_url,
             answer_image_url: updates.answer_image_url !== undefined ? updates.answer_image_url : f.answer_image_url,
             folderId: updates.folderId !== undefined ? updates.folderId : f.folderId
           }

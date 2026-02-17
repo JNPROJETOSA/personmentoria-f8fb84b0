@@ -752,6 +752,30 @@ export type Database = {
         }
         Relationships: []
       }
+      study_activity_log: {
+        Row: {
+          id: string
+          user_id: string
+          activity_date: string
+          activity_type: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          activity_date: string
+          activity_type: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          activity_date?: string
+          activity_type?: string
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       weekly_agenda: {
         Row: {
           completed_indices: number[] | null

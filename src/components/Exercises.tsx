@@ -10,6 +10,7 @@ import { ExerciseLog, MedicalArea, ClassItem } from '@/lib/types';
 import { AREA_COLORS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { getPerformanceColor } from '@/lib/utils';
+import { getLocalDateString, formatDateDisplay } from '@/lib/dateUtils';
 
 interface ExercisesProps {
   exercises: ExerciseLog[];
@@ -30,7 +31,7 @@ export default function Exercises({
   const [topicInputMode, setTopicInputMode] = useState<'manual' | 'class'>('manual');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [newExercise, setNewExercise] = useState<Partial<ExerciseLog>>({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     area: MedicalArea.CLINICA,
     topic: '',
     totalQuestions: 0,
@@ -125,7 +126,7 @@ export default function Exercises({
     });
 
     setNewExercise({
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       area: MedicalArea.CLINICA,
       topic: '',
       totalQuestions: 0,
@@ -312,7 +313,7 @@ export default function Exercises({
                       <span className="text-sm text-muted-foreground">{ex.area}</span>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                      <span>{new Date(ex.date).toLocaleDateString('pt-BR')}</span>
+                      <span>{formatDateDisplay(ex.date)}</span>
                       <span className="font-medium text-foreground">
                         {ex.correctAnswers}/{ex.totalQuestions}
                       </span>
