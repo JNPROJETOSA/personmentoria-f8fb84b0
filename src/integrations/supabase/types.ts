@@ -35,6 +35,86 @@ export type Database = {
         }
         Relationships: []
       }
+      general_notifications: {
+        Row: {
+          id: string
+          title: string
+          message: string
+          active: boolean
+          version: number
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          message: string
+          active?: boolean
+          version?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          message?: string
+          active?: boolean
+          version?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "general_notifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      general_notification_reads: {
+        Row: {
+          id: string
+          notification_id: string
+          user_id: string
+          version: number
+          read_at: string
+        }
+        Insert: {
+          id?: string
+          notification_id: string
+          user_id: string
+          version: number
+          read_at?: string
+        }
+        Update: {
+          id?: string
+          notification_id?: string
+          user_id?: string
+          version?: number
+          read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "general_notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "general_notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "general_notification_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       burnout_checkins: {
         Row: {
           created_at: string | null
@@ -87,6 +167,10 @@ export type Database = {
           studied: boolean | null
           title: string
           user_id: string
+          admin_origin: boolean | null
+          admin_inserted_by: string | null
+          admin_inserted_at: string | null
+          studied_date: string | null
         }
         Insert: {
           created_at?: string | null
@@ -97,6 +181,10 @@ export type Database = {
           studied?: boolean | null
           title: string
           user_id: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
+          studied_date?: string | null
         }
         Update: {
           created_at?: string | null
@@ -107,6 +195,10 @@ export type Database = {
           studied?: boolean | null
           title?: string
           user_id?: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
+          studied_date?: string | null
         }
         Relationships: []
       }
@@ -247,6 +339,9 @@ export type Database = {
           name: string
           performance: Json
           user_id: string
+          admin_origin: boolean | null
+          admin_inserted_by: string | null
+          admin_inserted_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -256,6 +351,9 @@ export type Database = {
           name: string
           performance: Json
           user_id: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -265,6 +363,9 @@ export type Database = {
           name?: string
           performance?: Json
           user_id?: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
         }
         Relationships: []
       }
@@ -278,6 +379,11 @@ export type Database = {
           topic: string
           total_questions: number
           user_id: string
+          admin_origin: boolean | null
+          admin_inserted_by: string | null
+          admin_inserted_at: string | null
+          class_id: string | null
+          block_name: string | null
         }
         Insert: {
           correct_answers: number
@@ -288,6 +394,11 @@ export type Database = {
           topic: string
           total_questions: number
           user_id: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
+          class_id?: string | null
+          block_name?: string | null
         }
         Update: {
           correct_answers?: number
@@ -298,6 +409,11 @@ export type Database = {
           topic?: string
           total_questions?: number
           user_id?: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
+          class_id?: string | null
+          block_name?: string | null
         }
         Relationships: []
       }
@@ -710,6 +826,9 @@ export type Database = {
           priority: number
           topic: string
           user_id: string
+          admin_origin: boolean | null
+          admin_inserted_by: string | null
+          admin_inserted_at: string | null
         }
         Insert: {
           completed?: boolean | null
@@ -719,6 +838,9 @@ export type Database = {
           priority: number
           topic: string
           user_id: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
         }
         Update: {
           completed?: boolean | null
@@ -728,6 +850,9 @@ export type Database = {
           priority?: number
           topic?: string
           user_id?: string
+          admin_origin?: boolean | null
+          admin_inserted_by?: string | null
+          admin_inserted_at?: string | null
         }
         Relationships: []
       }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ManualReviewLog } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
@@ -9,36 +9,36 @@ export function useReviews(userId: string | undefined) {
   const [reviews, setReviews] = useState<ManualReviewLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchReviews = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    const fetchReviews = async () => {
-      console.log('Fetching reviews...');
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
+    console.log('Fetching reviews...');
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching reviews:', error);
-      } else {
-        console.log('Reviews fetched:', data?.length);
-        const mapped = data.map(r => ({
-          id: r.id,
-          topic: r.topic,
-          date: r.date
-        }));
-        setReviews(mapped);
-      }
-      setLoading(false);
-    };
-
-    fetchReviews();
+    if (error) {
+      console.error('Error fetching reviews:', error);
+    } else {
+      console.log('Reviews fetched:', data?.length);
+      const mapped = data.map(r => ({
+        id: r.id,
+        topic: r.topic,
+        date: r.date
+      }));
+      setReviews(mapped);
+    }
+    setLoading(false);
   }, [userId]);
+
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
 
   const addReview = async (topic: string, area: string = 'Geral', dueDate?: string) => {
     if (!userId) {
@@ -89,5 +89,5 @@ export function useReviews(userId: string | undefined) {
     }
   };
 
-  return { reviews, loading, addReview };
+  return { reviews, loading, addReview, refetch: fetchReviews };
 }

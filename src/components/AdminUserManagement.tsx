@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,58 +65,57 @@ export const AdminUserManagement = () => {
                 return;
             }
 
+            // Step 1: Whitelist the user (Liberar acesso)
+            const { error: rpcError } = await supabase.rpc('admin_create_user', {
+                new_email: newEmail,
+                new_role: newRole,
+                new_name: newName
+            });
+
+            if (rpcError) throw rpcError;
+
+            // Step 2: Attempt to create the user with password if provided
             if (newPassword) {
-                // Call SQL RPC to create user
-                const { data, error } = await supabase.rpc('admin_create_user', {
-                    new_email: newEmail,
-                    new_password: newPassword,
-                    new_role: newRole,
-                    new_name: newName
+                const secondaryClient = createClient(
+                    import.meta.env.VITE_SUPABASE_URL,
+                    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                    { auth: { persistSession: false } }
+                );
+
+                const { error: signUpError } = await secondaryClient.auth.signUp({
+                    email: newEmail,
+                    password: newPassword,
+                    options: {
+                        data: {
+                            full_name: newName || newEmail,
+                            name: newName || newEmail.split('@')[0]
+                        }
+                    }
                 });
 
-                if (error) throw error;
-
-                const result = data as any;
-                if (result.status === 'created') {
+                if (signUpError) {
+                    console.warn('SignUp attempted but user might already exist or confirmation required:', signUpError);
                     toast({
-                        title: "Usuário criado com sucesso!",
-                        description: `${newEmail} foi cadastrado e já pode fazer login.`
+                        title: "Permissão concedida!",
+                        description: `${newEmail} já está na lista, mas a senha não pôde ser definida automaticamente (pode ser um usuário já existente).`
                     });
                 } else {
                     toast({
-                        title: "Usuário atualizado!",
-                        description: `O email ${newEmail} já existia. As permissões foram atualizadas.`
+                        title: "Usuário criado!",
+                        description: `${newEmail} foi cadastrado e permissionado como ${newRole}.`
                     });
                 }
             } else {
-                // Just whitelist logic
-                const { error } = await supabase
-                    .from('admin_whitelist')
-                    .insert([{
-                        email: newEmail,
-                        role: newRole,
-                        created_by: user?.id
-                    }]);
-
-                if (error) {
-                    if (error.code === '23505') { // Unique violation
-                        toast({ title: "Usuário já está na lista!", variant: "destructive" });
-                    } else {
-                        throw error;
-                    }
-                    return;
-                }
-
                 toast({
-                    title: "Convite enviado (Whitelist)!",
-                    description: `${newEmail} agora pode se cadastrar como ${newRole}.`
+                    title: "Permissão adicionada!",
+                    description: `${newEmail} agora pode se cadastrar no site como ${newRole}.`
                 });
             }
 
             setNewEmail('');
             setNewPassword('');
             setNewName('');
-            fetchUsers(); // Refresh list
+            fetchUsers(); 
         } catch (error: any) {
             console.error('Error adding user:', error);
             toast({

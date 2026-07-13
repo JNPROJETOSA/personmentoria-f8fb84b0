@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile, Timer, UserCircle, Shield, ChevronDown, ChevronRight, Stethoscope, PanelLeft } from 'lucide-react';
+import { LayoutDashboard, PieChart, BookOpen, PenTool, Calendar, FileText, BrainCircuit, Menu, X, FileDown, Book, Sun, Moon, LogOut, Clock, CreditCard, Trophy, Heart, ScrollText, Smile, Timer, UserCircle, Shield, ChevronDown, ChevronRight, Stethoscope, PanelLeft, History } from 'lucide-react';
 import Dashboard from '@/components/Dashboard';
 import Analysis from '@/components/Analysis';
 import Classes from '@/components/Classes';
@@ -24,6 +24,7 @@ import FrozenAccountScreen from '@/components/FrozenAccountScreen';
 
 import MindMaps from '@/components/MindMaps';
 import { StudentMeetingScheduler } from '@/components/StudentMeetingScheduler';
+import { AcademicHistorySection } from '@/components/admin/AcademicHistorySection';
 
 
 import { TabType, ClassItem, ExerciseLog, ExamLog, NotebookData, MedicalArea, ManualReviewLog, Goals, UserProgress, Flashcard, DreamBoardItem, EditorialData, BurnoutData, ExamModeData } from '@/lib/types';
@@ -46,6 +47,8 @@ import { useBurnout } from '@/hooks/useBurnout';
 import { useExamMode } from '@/hooks/useExamMode';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAdminData } from '@/hooks/useAdminData';
+import { useGeneralNotifications } from '@/hooks/useGeneralNotifications';
+import GeneralNotificationModal from '@/components/GeneralNotificationModal';
 
 // Fixed tab labels mapping
 const TAB_LABELS: Record<TabType, string> = {
@@ -68,7 +71,8 @@ const TAB_LABELS: Record<TabType, string> = {
   'mind-maps': 'Mapas Mentais',
   'profile-settings': 'Informações Pessoais',
   'meeting': 'Marcar Reunião',
-  admin: 'Administrador'
+  admin: 'Administrador',
+  'academic-history': 'Histórico Anterior'
 };
 
 
@@ -81,15 +85,15 @@ const AuthenticatedApp = () => {
   const { profile, updateProfile } = useProfile(user?.id);
 
   // Cloud database hooks
-  const { classes, addClass, updateClass, deleteClass } = useClasses(user?.id);
-  const { exercises, addExercise, deleteExercise } = useExercises(user?.id);
+  const { classes, addClass, updateClass, deleteClass, refetch: refetchClasses } = useClasses(user?.id);
+  const { exercises, addExercise, updateExercise, deleteExercise, refetch: refetchExercises } = useExercises(user?.id);
   const { flashcards, addFlashcard, deleteFlashcard, updateFlashcard } = useFlashcards(user?.id);
   const { folders, addFolder, updateFolder, deleteFolder } = useFlashcardFolders(user?.id);
   const { goals, updateGoals } = useGoals(user?.id);
   const { items: dreamBoardItems, addItem: addDreamItem, deleteItem: deleteDreamItem } = useDreamBoard(user?.id);
   // Notebook now manages its own hooks
-  const { exams, addExam, deleteExam } = useExams(user?.id);
-  const { reviews: manualReviews, addReview } = useReviews(user?.id);
+  const { exams, addExam, deleteExam, refetch: refetchExams } = useExams(user?.id);
+  const { reviews: manualReviews, addReview, refetch: refetchReviews } = useReviews(user?.id);
   const { editorials, selectedEditorialId, setSelectedEditorialId, editorialData, updateTopicStatus, setEditorialData, createEditorial, deleteEditorial, renameEditorial, deleteSubarea, renameSubarea, deleteTopic, renameTopic } = useEditorial(user?.id);
   const { burnoutData, addCheckIn: addBurnoutCheckIn, setBurnoutData, loading: burnoutLoading } = useBurnout(user?.id);
   const { examModeData, addSession: addExamSession, updateMantra, setExamModeData, loading: examModeLoading } = useExamMode(user?.id);
@@ -97,9 +101,25 @@ const AuthenticatedApp = () => {
   // Admin hooks
   const { isAdmin, isMentor, loading: authLoading } = useAuth();
   const { users: adminUsers, loading: adminLoading, toggleFreezeUser } = useAdminData(isAdmin || isMentor);
+  
+  // General notifications hook
+  const { pendingNotifications, markAsRead } = useGeneralNotifications(user?.id, isAdmin);
 
   // Check if user is frozen
   const isFrozen = profile?.frozen || false;
+
+  // Refetch database states when changing tabs to ensure retroactive entries are synced
+  useEffect(() => {
+    if (activeTab === 'exercises') {
+      refetchExercises();
+    } else if (activeTab === 'classes') {
+      refetchClasses();
+    } else if (activeTab === 'exams') {
+      refetchExams();
+    } else if (activeTab === 'reviews') {
+      refetchReviews();
+    }
+  }, [activeTab, refetchExercises, refetchClasses, refetchExams, refetchReviews]);
 
   // UserProgress from profile
   const userProgress: UserProgress = {
@@ -282,7 +302,7 @@ const AuthenticatedApp = () => {
       case 'dashboard': return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} userId={user?.id} />;
       case 'analysis': return <Analysis exercises={exercises} />;
       case 'classes': return <Classes classes={classes} addClass={addClass} updateClass={updateClass} deleteClass={deleteClass} />;
-      case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} deleteExercise={deleteExercise} classes={classes} onAutoCompleteReview={handleAutoCompleteReview} />;
+      case 'exercises': return <Exercises exercises={exercises} addExercise={addExercise} updateExercise={updateExercise} deleteExercise={deleteExercise} classes={classes} onAutoCompleteReview={handleAutoCompleteReview} />;
       case 'reviews': return <Reviews reviews={pendingReviews} onMarkReviewed={handleMarkReviewed} manualReviews={manualReviews} />;
       case 'exams': return <Exams exams={exams} addExam={addExam} deleteExam={deleteExam} addXP={handleAddXP} />;
       case 'ai-tutor': return <AIChat exercises={exercises} classes={classes} />;
@@ -296,10 +316,10 @@ const AuthenticatedApp = () => {
       case 'editorial': return <Editorial data={editorialData} setData={setEditorialData} updateTopicStatus={updateTopicStatus} onAddXP={handleAddXP} onTabChange={handleTabChange} editorials={editorials} selectedEditorialId={selectedEditorialId} setSelectedEditorialId={setSelectedEditorialId} createEditorial={createEditorial} deleteEditorial={deleteEditorial} renameEditorial={renameEditorial} deleteSubarea={deleteSubarea} renameSubarea={renameSubarea} deleteTopic={deleteTopic} renameTopic={renameTopic} />;
       case 'xo-burnout': return burnoutLoading ? <div className="text-center py-8">Carregando...</div> : <XoBurnout data={burnoutData} addCheckIn={addBurnoutCheckIn} />;
       case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
-      case 'exam-mode': return examModeLoading ? <div className="text-center py-8">Carregando...</div> : <ExamMode data={examModeData} addSession={addExamSession} updateMantra={updateMantra} />;
       case 'profile-settings': return <ProfileSettings profile={profile} updateProfile={updateProfile} userEmail={user?.email} />;
       case 'meeting': return <StudentMeetingScheduler />;
       case 'admin': return <AdminDashboard users={adminUsers} loading={adminLoading} toggleFreezeUser={toggleFreezeUser} />;
+      case 'academic-history': return <AcademicHistorySection studentUserId={user?.id || ''} studentName={profile?.name || 'Estudante'} isStudentView={true} />;
 
       default: return <Dashboard exercises={exercises} classes={classes} pendingReviews={pendingReviews} goals={goals} setGoals={updateGoals} userProgress={userProgress} userId={user?.id} />;
     }
@@ -394,6 +414,7 @@ const AuthenticatedApp = () => {
 
           <div className="my-4 border-t pt-4">
             <p className="px-4 text-xs font-semibold text-muted-foreground uppercase mb-2">Conta</p>
+            <NavItem id="academic-history" label="Histórico Anterior" icon={History} />
             <NavItem id="profile-settings" label="Informações Pessoais" icon={UserCircle} />
             <NavItem id="meeting" label="Marcar Reunião" icon={Calendar} />
             {(isAdmin || isMentor) && (
@@ -441,6 +462,13 @@ const AuthenticatedApp = () => {
         </div>
       </main>
 
+      {pendingNotifications.length > 0 && (
+        <GeneralNotificationModal
+          key={pendingNotifications[0].id}
+          notification={pendingNotifications[0]}
+          onRead={markAsRead}
+        />
+      )}
     </div>
   );
 };

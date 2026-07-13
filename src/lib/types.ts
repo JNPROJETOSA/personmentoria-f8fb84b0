@@ -6,7 +6,7 @@ export enum MedicalArea {
   CIRURGIA = 'Cirurgia'
 }
 
-export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode' | 'profile-settings' | 'admin' | 'meeting' | 'mind-maps';
+export type TabType = 'dashboard' | 'analysis' | 'classes' | 'exercises' | 'reviews' | 'exams' | 'ai-tutor' | 'reports' | 'notebook' | 'pomodoro' | 'flashcards' | 'banca-analysis' | 'dream-board' | 'editorial' | 'xo-burnout' | 'exam-mode' | 'profile-settings' | 'admin' | 'meeting' | 'mind-maps' | 'academic-history';
 
 export interface Flashcard {
   id: string;
@@ -60,6 +60,8 @@ export interface ExerciseLog {
   topic: string;
   totalQuestions: number;
   correctAnswers: number;
+  classId?: string | null;
+  blockName?: string | null;
 }
 
 export interface ExamLog {
@@ -222,5 +224,24 @@ export interface PDFFile {
   created_at: string;
   created_by: string | null;
   updated_at: string;
+}
+
+export interface GeneralNotification {
+  id: string;
+  title: string;
+  message: string;
+  active: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+}
+
+export interface GeneralNotificationRead {
+  id: string;
+  notification_id: string;
+  user_id: string;
+  version: number;
+  read_at: string;
 }
 

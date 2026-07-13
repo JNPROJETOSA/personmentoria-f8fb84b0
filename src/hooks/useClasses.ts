@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClassItem } from '@/lib/types';
 
@@ -6,38 +6,38 @@ export function useClasses(userId: string | undefined) {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchClasses = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    const fetchClasses = async () => {
-      const { data, error } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching classes:', error);
-      } else {
-        const mapped = data.map(c => ({
-          id: c.id,
-          title: c.title,
-          area: c.specialty as any,
-          date: c.date,
-          studied: c.studied,
-          priority: c.priority as 1 | 2 | 3,
-          studied_date: c.studied_date || undefined
-        }));
-        setClasses(mapped);
-      }
-      setLoading(false);
-    };
-
-    fetchClasses();
+    if (error) {
+      console.error('Error fetching classes:', error);
+    } else {
+      const mapped = data.map(c => ({
+        id: c.id,
+        title: c.title,
+        area: c.specialty as any,
+        date: c.date,
+        studied: c.studied,
+        priority: c.priority as 1 | 2 | 3,
+        studied_date: c.studied_date || undefined
+      }));
+      setClasses(mapped);
+    }
+    setLoading(false);
   }, [userId]);
+
+  useEffect(() => {
+    fetchClasses();
+  }, [fetchClasses]);
 
   const addClass = async (classItem: Omit<ClassItem, 'id'>) => {
     if (!userId) return;
@@ -120,5 +120,5 @@ export function useClasses(userId: string | undefined) {
     }
   };
 
-  return { classes, loading, addClass, updateClass, deleteClass, setClasses };
+  return { classes, loading, addClass, updateClass, deleteClass, setClasses, refetch: fetchClasses };
 }

@@ -12,6 +12,7 @@ import { AdminUserManagement } from './AdminUserManagement';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { MentorAgenda } from './MentorAgenda';
+import GeneralNotificationsAdmin from './GeneralNotificationsAdmin';
 
 
 interface AdminDashboardProps {
@@ -81,6 +82,7 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
           <TabsTrigger value="dashboard">Visão Geral & Alunos</TabsTrigger>
           {isAdmin && <TabsTrigger value="access-control">Controle de Acessos</TabsTrigger>}
           {(isMentor || isAdmin) && <TabsTrigger value="agenda">Agenda de Reuniões</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="general-notifications">Notificação Geral</TabsTrigger>}
         </TabsList>
 
 
@@ -244,6 +246,12 @@ const AdminDashboard = ({ users, loading, toggleFreezeUser }: AdminDashboardProp
         {(isMentor || isAdmin) && (
           <TabsContent value="agenda" className="animate-in fade-in-50 duration-300">
             <MentorAgenda />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="general-notifications" className="animate-in fade-in-50 duration-300">
+            <GeneralNotificationsAdmin />
           </TabsContent>
         )}
 

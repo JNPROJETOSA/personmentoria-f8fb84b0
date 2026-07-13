@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ExerciseLog } from '@/lib/types';
 
@@ -6,37 +6,39 @@ export function useExercises(userId: string | undefined) {
   const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchExercises = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    const fetchExercises = async () => {
-      const { data, error } = await supabase
-        .from('exercises')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching exercises:', error);
-      } else {
-        const mapped = data.map(e => ({
-          id: e.id,
-          date: e.date,
-          area: e.specialty as any,
-          topic: e.topic,
-          totalQuestions: e.total_questions,
-          correctAnswers: e.correct_answers
-        }));
-        setExercises(mapped);
-      }
-      setLoading(false);
-    };
-
-    fetchExercises();
+    if (error) {
+      console.error('Error fetching exercises:', error);
+    } else {
+      const mapped = data.map(e => ({
+        id: e.id,
+        date: e.date,
+        area: e.specialty as any,
+        topic: e.topic,
+        totalQuestions: e.total_questions,
+        correctAnswers: e.correct_answers,
+        classId: e.class_id,
+        blockName: e.block_name
+      }));
+      setExercises(mapped);
+    }
+    setLoading(false);
   }, [userId]);
+
+  useEffect(() => {
+    fetchExercises();
+  }, [fetchExercises]);
 
   const addExercise = async (exercise: Omit<ExerciseLog, 'id'>) => {
     if (!userId) return;
@@ -49,7 +51,9 @@ export function useExercises(userId: string | undefined) {
         specialty: exercise.area,
         topic: exercise.topic,
         total_questions: exercise.totalQuestions,
-        correct_answers: exercise.correctAnswers
+        correct_answers: exercise.correctAnswers,
+        class_id: exercise.classId,
+        block_name: exercise.blockName
       })
       .select()
       .single();
@@ -63,7 +67,9 @@ export function useExercises(userId: string | undefined) {
         area: data.specialty as any,
         topic: data.topic,
         totalQuestions: data.total_questions,
-        correctAnswers: data.correct_answers
+        correctAnswers: data.correct_answers,
+        classId: data.class_id,
+        blockName: data.block_name
       }]);
     }
   };
@@ -75,8 +81,10 @@ export function useExercises(userId: string | undefined) {
     if (updates.date) dbUpdates.date = updates.date;
     if (updates.area) dbUpdates.specialty = updates.area;
     if (updates.topic) dbUpdates.topic = updates.topic;
-    if (updates.totalQuestions) dbUpdates.total_questions = updates.totalQuestions;
-    if (updates.correctAnswers) dbUpdates.correct_answers = updates.correctAnswers;
+    if (updates.totalQuestions !== undefined) dbUpdates.total_questions = updates.totalQuestions;
+    if (updates.correctAnswers !== undefined) dbUpdates.correct_answers = updates.correctAnswers;
+    if (updates.classId !== undefined) dbUpdates.class_id = updates.classId;
+    if (updates.blockName !== undefined) dbUpdates.block_name = updates.blockName;
 
     const { error } = await supabase
       .from('exercises')
@@ -107,5 +115,5 @@ export function useExercises(userId: string | undefined) {
     }
   };
 
-  return { exercises, loading, addExercise, updateExercise, deleteExercise, setExercises };
+  return { exercises, loading, addExercise, updateExercise, deleteExercise, setExercises, refetch: fetchExercises };
 }

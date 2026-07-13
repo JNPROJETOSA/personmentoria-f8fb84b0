@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ExamLog } from '@/lib/types';
 
@@ -6,39 +6,39 @@ export function useExams(userId: string | undefined) {
   const [exams, setExams] = useState<ExamLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchExams = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    const fetchExams = async () => {
-      const { data, error } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
+    const { data, error } = await supabase
+      .from('exams')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching exams:', error);
-      } else {
-        const mapped = data.map(e => ({
-          id: e.id,
-          name: e.name,
-          institution: e.institution,
-          date: e.date,
-          totalQuestions: (e.performance as any).totalQuestions,
-          correctAnswers: (e.performance as any).correctAnswers,
-          areas: (e.performance as any).areas || [],
-          areaDetails: (e.performance as any).areaDetails || []
-        }));
-        setExams(mapped);
-      }
-      setLoading(false);
-    };
-
-    fetchExams();
+    if (error) {
+      console.error('Error fetching exams:', error);
+    } else {
+      const mapped = data.map(e => ({
+        id: e.id,
+        name: e.name,
+        institution: e.institution,
+        date: e.date,
+        totalQuestions: (e.performance as any).totalQuestions,
+        correctAnswers: (e.performance as any).correctAnswers,
+        areas: (e.performance as any).areas || [],
+        areaDetails: (e.performance as any).areaDetails || []
+      }));
+      setExams(mapped);
+    }
+    setLoading(false);
   }, [userId]);
+
+  useEffect(() => {
+    fetchExams();
+  }, [fetchExams]);
 
   const addExam = async (exam: Omit<ExamLog, 'id'>) => {
     if (!userId) return;
@@ -92,5 +92,5 @@ export function useExams(userId: string | undefined) {
     }
   };
 
-  return { exams, loading, addExam, deleteExam, setExams };
+  return { exams, loading, addExam, deleteExam, setExams, refetch: fetchExams };
 }

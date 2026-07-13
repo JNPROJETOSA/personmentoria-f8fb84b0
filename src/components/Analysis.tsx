@@ -55,6 +55,7 @@ const TopicRow = ({ topic, index }: { topic: any, index: number }) => {
                   <TableHeader>
                     <TableRow className="border-b-0 bg-muted/50">
                       <TableHead>Data</TableHead>
+                      <TableHead>Nome do Bloco</TableHead>
                       <TableHead className="text-center">Questões</TableHead>
                       <TableHead className="text-center">Acertos</TableHead>
                       <TableHead className="text-center">Erros</TableHead>
@@ -65,6 +66,7 @@ const TopicRow = ({ topic, index }: { topic: any, index: number }) => {
                     {topic.history.map((log: any, idx: number) => (
                       <TableRow key={idx} className="border-b-0">
                         <TableCell className="py-2">{new Date(log.date).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell className="py-2 font-medium">{log.blockName || 'Bloco de Exercícios'}</TableCell>
                         <TableCell className="text-center py-2">{log.total}</TableCell>
                         <TableCell className="text-center text-green-600 py-2">{log.correct}</TableCell>
                         <TableCell className="text-center text-red-500 py-2">{log.total - log.correct}</TableCell>
@@ -123,7 +125,8 @@ export default function Analysis({ exercises }: AnalysisProps) {
       date: ex.date,
       total: ex.totalQuestions,
       correct: ex.correctAnswers,
-      accuracy: ex.totalQuestions > 0 ? (ex.correctAnswers / ex.totalQuestions) * 100 : 0
+      accuracy: ex.totalQuestions > 0 ? (ex.correctAnswers / ex.totalQuestions) * 100 : 0,
+      blockName: ex.blockName
     });
 
     return acc;
@@ -137,7 +140,7 @@ export default function Analysis({ exercises }: AnalysisProps) {
       acertos: t.correct,
       erros: t.total - t.correct,
       ultimaPratica: new Date(t.lastPractice).toLocaleDateString('pt-BR'),
-      history: t.history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      history: t.history.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     }))
     .sort((a, b) => a.acurácia - b.acurácia); // Sort from worst to best
 

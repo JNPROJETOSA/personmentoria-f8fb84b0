@@ -31,6 +31,7 @@ import { ensurePdfExtension, savePdf } from '@/lib/pdf-helpers';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { saveAs } from 'file-saver';
 import { FlashcardDetailDialog } from '@/components/FlashcardDetailDialog';
+import { AcademicHistorySection } from '@/components/admin/AcademicHistorySection';
 
 interface AdminUserAnalysisProps {
   user: UserSummary;
@@ -84,6 +85,7 @@ const TopicRow = ({ topic, index }: { topic: any, index: number }) => {
                   <TableHeader>
                     <TableRow className="border-b-0 bg-muted/50">
                       <TableHead>Data</TableHead>
+                      <TableHead>Nome do Bloco</TableHead>
                       <TableHead className="text-center">Questões</TableHead>
                       <TableHead className="text-center">Acertos</TableHead>
                       <TableHead className="text-center">Erros</TableHead>
@@ -94,6 +96,7 @@ const TopicRow = ({ topic, index }: { topic: any, index: number }) => {
                     {topic.history.map((log: any, idx: number) => (
                       <TableRow key={idx} className="border-b-0">
                         <TableCell className="py-2">{new Date(log.date).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell className="py-2 font-medium">{log.blockName || 'Bloco de Exercícios'}</TableCell>
                         <TableCell className="text-center py-2">{log.total}</TableCell>
                         <TableCell className="text-center text-green-600 py-2">{log.correct}</TableCell>
                         <TableCell className="text-center text-red-500 py-2">{log.total - log.correct}</TableCell>
@@ -346,7 +349,8 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
       date: ex.date,
       total: ex.total_questions,
       correct: ex.correct_answers,
-      accuracy: ex.total_questions > 0 ? (ex.correct_answers / ex.total_questions) * 100 : 0
+      accuracy: ex.total_questions > 0 ? (ex.correct_answers / ex.total_questions) * 100 : 0,
+      blockName: ex.block_name
     });
 
     return acc;
@@ -355,8 +359,8 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
   const topicData = Object.values(topicStats)
     .map((t: any) => ({
       ...t,
-      // Sort history by date descending
-      history: t.history.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      // Sort history by date ascending
+      history: t.history.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()),
       accuracy: Math.round((t.total > 0 ? t.correct / t.total : 0) * 100),
       errors: t.total - t.correct
     }))
@@ -937,6 +941,14 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Academic History Section - Admin Only */}
+      {isAdmin && (
+        <AcademicHistorySection
+          studentUserId={user.user_id}
+          studentName={user.name}
+        />
+      )}
 
       {/* Manual Notifications Section */}
       <Card className="border-2 border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-card">
