@@ -879,7 +879,7 @@ const AdminUserAnalysis = ({ user, onBack }: AdminUserAnalysisProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WeeklyAgenda userId={user.user_id} isAdminView={true} />
+          <WeeklyAgenda userId={user.user_id} isAdminView={true} studentName={user.name} />
         </CardContent>
       </Card>
 

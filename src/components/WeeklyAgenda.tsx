@@ -3,8 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Plus, X, Edit2, Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Plus, X, Edit2, Check, Trash2, ChevronLeft, ChevronRight, Settings, Sparkles, AlertTriangle } from 'lucide-react';
 import { useWeeklyAgenda } from '@/hooks/useWeeklyAgenda';
+import { useWeeklyAgendaTemplate } from '@/hooks/useWeeklyAgendaTemplate';
+import { WeeklyAgendaTemplateModal } from '@/components/WeeklyAgendaTemplateModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -13,6 +17,7 @@ const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 
 interface WeeklyAgendaProps {
   userId?: string; // If provided, admin is editing another user's agenda
   isAdminView?: boolean;
+  studentName?: string;
 }
 
 interface TimeBlock {
@@ -57,13 +62,18 @@ const serializeTask = (block: Omit<TimeBlock, 'originalIndex' | 'isCompleted'>):
   });
 };
 
-export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps) {
+export function WeeklyAgenda({ userId, isAdminView = false, studentName }: WeeklyAgendaProps) {
   const MAX_WEEKS_BACK = 12;
   const MAX_WEEKS_FORWARD = 12;
 
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const { agenda, loading, updateDayTasks, toggleTaskCompletion } = useWeeklyAgenda(userId, currentWeekOffset);
+  const { templateDays } = useWeeklyAgendaTemplate(userId);
   const [editingDay, setEditingDay] = useState<number | null>(null);
+
+  // Template Modal & Conflict States
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [conflictTarget, setConflictTarget] = useState<{ mode: 'single' | 'full'; dayOfWeek?: number } | null>(null);
 
   // New Task State
   const [newTaskDescription, setNewTaskDescription] = useState('');
@@ -78,6 +88,108 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
 
   const weekStart = startOfWeek(addWeeks(new Date(), currentWeekOffset), { weekStartsOn: 0 });
   const weekEnd = addDays(weekStart, 6);
+  const today = new Date().getDay();
+
+  // Template application handlers
+  const applySingleDayTemplate = async (dayOfWeek: number, mode: 'append' | 'replace' = 'append') => {
+    if (!agenda) return;
+    const tDay = templateDays.find(d => d.dayOfWeek === dayOfWeek);
+    if (!tDay || !tDay.tasks || tDay.tasks.length === 0) {
+      toast({
+        title: "Semana Padrão vazia",
+        description: `Nenhuma atividade cadastrada para ${DAY_NAMES[dayOfWeek]} na Semana Padrão.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const currentDay = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
+    const existingTasks = currentDay?.tasks || [];
+
+    let finalTasks: string[] = [];
+    if (mode === 'append') {
+      finalTasks = [...existingTasks, ...tDay.tasks];
+    } else {
+      finalTasks = [...tDay.tasks];
+    }
+
+    await updateDayTasks(dayOfWeek, finalTasks);
+    toast({
+      title: "Dia Padrão aplicado!",
+      description: `As atividades da ${DAY_NAMES[dayOfWeek]} Padrão foram adicionadas à agenda.`,
+    });
+  };
+
+  const applyFullWeekTemplate = async (mode: 'append' | 'replace' = 'append') => {
+    if (!agenda) return;
+
+    const hasAnyTemplateTasks = templateDays.some(d => d.tasks && d.tasks.length > 0);
+    if (!hasAnyTemplateTasks) {
+      toast({
+        title: "Semana Padrão vazia",
+        description: "Nenhuma atividade foi configurada na Semana Padrão. Clique em 'Configurar Semana Padrão' para definir.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      const tDay = templateDays.find(d => d.dayOfWeek === dayIdx);
+      if (!tDay || !tDay.tasks || tDay.tasks.length === 0) continue;
+
+      const currentDay = agenda.days.find(d => d.dayOfWeek === dayIdx);
+      const existingTasks = currentDay?.tasks || [];
+
+      let finalTasks: string[] = [];
+      if (mode === 'append') {
+        finalTasks = [...existingTasks, ...tDay.tasks];
+      } else {
+        finalTasks = [...tDay.tasks];
+      }
+
+      await updateDayTasks(dayIdx, finalTasks);
+    }
+
+    toast({
+      title: "Semana Padrão aplicada!",
+      description: "A grade semanal padrão foi copiada para as datas desta semana.",
+    });
+  };
+
+  const handleRequestApplySingleDay = (dayOfWeek: number) => {
+    if (!agenda) return;
+    const currentDay = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
+    const existingTasks = currentDay?.tasks || [];
+
+    if (existingTasks.length > 0) {
+      setConflictTarget({ mode: 'single', dayOfWeek });
+    } else {
+      applySingleDayTemplate(dayOfWeek, 'append');
+    }
+  };
+
+  const handleRequestApplyFullWeek = () => {
+    if (!agenda) return;
+    const hasExistingTasksInWeek = agenda.days.some(d => d.tasks && d.tasks.length > 0);
+
+    if (hasExistingTasksInWeek) {
+      setConflictTarget({ mode: 'full' });
+    } else {
+      applyFullWeekTemplate('append');
+    }
+  };
+
+  const handleConfirmConflict = (mode: 'append' | 'replace') => {
+    if (!conflictTarget) return;
+
+    if (conflictTarget.mode === 'single' && conflictTarget.dayOfWeek !== undefined) {
+      applySingleDayTemplate(conflictTarget.dayOfWeek, mode);
+    } else if (conflictTarget.mode === 'full') {
+      applyFullWeekTemplate(mode);
+    }
+
+    setConflictTarget(null);
+  };
   const today = new Date().getDay();
 
   // Navigation functions
@@ -218,7 +330,7 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
       <CardHeader className="pb-2">
         <div className="flex flex-col gap-4">
           {/* Title and Week Info */}
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-2">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
@@ -238,6 +350,29 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                   {weekRangeLabel}
                 </p>
               </div>
+            </div>
+
+            {/* Template Actions */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTemplateModalOpen(true)}
+                className="h-9 text-xs border-primary/30 text-primary bg-primary/10 hover:bg-primary/20 font-medium"
+              >
+                <Settings className="h-3.5 w-3.5 mr-1.5" />
+                Configurar Semana Padrão
+              </Button>
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleRequestApplyFullWeek}
+                className="h-9 text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold shadow-sm"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Aplicar Semana Padrão
+              </Button>
             </div>
           </div>
 
@@ -308,7 +443,7 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                   }
                 `}
               >
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-3 gap-1">
                   <div>
                     <h4 className={`font-bold text-base ${isToday ? 'text-primary' : 'text-white'}`}>
                       {DAY_NAMES[day.dayOfWeek]}
@@ -317,23 +452,36 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
                       {format(dayDate, 'dd/MM')}
                     </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-slate-300 hover:text-white hover:bg-white/10"
-                    onClick={() => {
-                      if (!isEditing) {
-                        const nextSlot = getNextTimeSlot(day.tasks);
-                        setNewTaskStart(nextSlot.start);
-                        setNewTaskEnd(nextSlot.end);
-                        setEditingDay(day.dayOfWeek);
-                      } else {
-                        setEditingDay(null);
-                      }
-                    }}
-                  >
-                    {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
-                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-[11px] text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 px-1.5 font-medium"
+                      title={`Aplicar ${DAY_NAMES[day.dayOfWeek]} Padrão neste dia`}
+                      onClick={() => handleRequestApplySingleDay(day.dayOfWeek)}
+                    >
+                      + {DAY_NAMES[day.dayOfWeek].slice(0, 3)} Padrão
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-slate-300 hover:text-white hover:bg-white/10 shrink-0"
+                      onClick={() => {
+                        if (!isEditing) {
+                          const nextSlot = getNextTimeSlot(day.tasks);
+                          setNewTaskStart(nextSlot.start);
+                          setNewTaskEnd(nextSlot.end);
+                          setEditingDay(day.dayOfWeek);
+                        } else {
+                          setEditingDay(null);
+                        }
+                      }}
+                    >
+                      {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 flex-1">
@@ -490,6 +638,48 @@ export function WeeklyAgenda({ userId, isAdminView = false }: WeeklyAgendaProps)
           })}
         </div>
       </CardContent>
+
+      {/* Template Settings Modal */}
+      <WeeklyAgendaTemplateModal
+        open={isTemplateModalOpen}
+        onOpenChange={setIsTemplateModalOpen}
+        userId={userId}
+        studentName={studentName}
+      />
+
+      {/* Conflict Resolution Dialog */}
+      <Dialog open={!!conflictTarget} onOpenChange={(open) => !open && setConflictTarget(null)}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-500">
+              <AlertTriangle className="w-5 h-5" />
+              Programação Existente Encontrada
+            </DialogTitle>
+            <DialogDescription>
+              {conflictTarget?.mode === 'single'
+                ? `Já existem tarefas cadastradas nesta data. Como deseja aplicar as tarefas da ${DAY_NAMES[conflictTarget.dayOfWeek ?? 0]} Padrão?`
+                : 'Já existem tarefas cadastradas nesta semana. Como você deseja aplicar a Semana Padrão?'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 text-xs text-muted-foreground space-y-2">
+            <p>• <strong>Adicionar às existentes:</strong> Preserva todas as tarefas que já estão na agenda e inclui as tarefas do modelo.</p>
+            <p>• <strong>Substituir tarefas:</strong> Subescreve a programação atual pelas tarefas da Semana Padrão.</p>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" size="sm" onClick={() => setConflictTarget(null)}>
+              Cancelar
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleConfirmConflict('replace')} className="text-destructive">
+              Substituir Tarefas
+            </Button>
+            <Button size="sm" onClick={() => handleConfirmConflict('append')} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+              Adicionar às Existentes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
