@@ -13,6 +13,7 @@ interface WeeklyAgendaTemplateModalProps {
   onOpenChange: (open: boolean) => void;
   userId?: string;
   studentName?: string;
+  onSaveSuccess?: () => void;
 }
 
 const DAY_NAMES = [
@@ -63,7 +64,8 @@ export function WeeklyAgendaTemplateModal({
   open,
   onOpenChange,
   userId,
-  studentName
+  studentName,
+  onSaveSuccess
 }: WeeklyAgendaTemplateModalProps) {
   const { templateDays, loading, saveFullTemplate, refetchTemplate } = useWeeklyAgendaTemplate(userId);
   const [selectedDay, setSelectedDay] = useState<number>(1); // Default Segunda-feira
@@ -184,6 +186,7 @@ export function WeeklyAgendaTemplateModal({
         title: "Semana Padrão salva!",
         description: "O modelo de rotina foi atualizado com sucesso no banco de dados.",
       });
+      onSaveSuccess?.();
       onOpenChange(false);
     } else {
       toast({

@@ -68,7 +68,7 @@ export function WeeklyAgenda({ userId, isAdminView = false, studentName }: Weekl
 
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const { agenda, loading, updateDayTasks, toggleTaskCompletion } = useWeeklyAgenda(userId, currentWeekOffset);
-  const { templateDays } = useWeeklyAgendaTemplate(userId);
+  const { templateDays, refetchTemplate } = useWeeklyAgendaTemplate(userId);
   const [editingDay, setEditingDay] = useState<number | null>(null);
 
   // Template Modal & Conflict States
@@ -96,8 +96,8 @@ export function WeeklyAgenda({ userId, isAdminView = false, studentName }: Weekl
     const tDay = templateDays.find(d => d.dayOfWeek === dayOfWeek);
     if (!tDay || !tDay.tasks || tDay.tasks.length === 0) {
       toast({
-        title: "Semana Padrão vazia",
-        description: `Nenhuma atividade cadastrada para ${DAY_NAMES[dayOfWeek]} na Semana Padrão.`,
+        title: "Dia Padrão sem atividades",
+        description: `Nenhuma atividade cadastrada para ${DAY_NAMES[dayOfWeek]} na Semana Padrão. Clique em 'Configurar Semana Padrão' para adicionar tarefas a este dia.`,
         variant: "destructive"
       });
       return;
@@ -156,8 +156,20 @@ export function WeeklyAgenda({ userId, isAdminView = false, studentName }: Weekl
     });
   };
 
-  const handleRequestApplySingleDay = (dayOfWeek: number) => {
+  const handleRequestApplySingleDay = async (dayOfWeek: number) => {
     if (!agenda) return;
+    await refetchTemplate();
+
+    const tDay = templateDays.find(d => d.dayOfWeek === dayOfWeek);
+    if (!tDay || !tDay.tasks || tDay.tasks.length === 0) {
+      toast({
+        title: "Dia Padrão sem atividades",
+        description: `Nenhuma atividade cadastrada para ${DAY_NAMES[dayOfWeek]} na Semana Padrão. Clique em 'Configurar Semana Padrão' para adicionar tarefas a este dia.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     const currentDay = agenda.days.find(d => d.dayOfWeek === dayOfWeek);
     const existingTasks = currentDay?.tasks || [];
 
@@ -168,8 +180,20 @@ export function WeeklyAgenda({ userId, isAdminView = false, studentName }: Weekl
     }
   };
 
-  const handleRequestApplyFullWeek = () => {
+  const handleRequestApplyFullWeek = async () => {
     if (!agenda) return;
+    await refetchTemplate();
+
+    const hasAnyTemplateTasks = templateDays.some(d => d.tasks && d.tasks.length > 0);
+    if (!hasAnyTemplateTasks) {
+      toast({
+        title: "Semana Padrão vazia",
+        description: "Nenhuma atividade foi configurada na Semana Padrão. Clique em 'Configurar Semana Padrão' para definir.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const hasExistingTasksInWeek = agenda.days.some(d => d.tasks && d.tasks.length > 0);
 
     if (hasExistingTasksInWeek) {
@@ -641,9 +665,13 @@ export function WeeklyAgenda({ userId, isAdminView = false, studentName }: Weekl
       {/* Template Settings Modal */}
       <WeeklyAgendaTemplateModal
         open={isTemplateModalOpen}
-        onOpenChange={setIsTemplateModalOpen}
+        onOpenChange={(open) => {
+          setIsTemplateModalOpen(open);
+          if (!open) refetchTemplate();
+        }}
         userId={userId}
         studentName={studentName}
+        onSaveSuccess={refetchTemplate}
       />
 
       {/* Conflict Resolution Dialog */}
