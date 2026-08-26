@@ -19,6 +19,7 @@ interface ExercisesProps {
   updateExercise: (id: string, updates: Partial<ExerciseLog>) => Promise<void>;
   deleteExercise: (id: string) => Promise<void>;
   classes?: ClassItem[];
+  addClass?: (classItem: Omit<ClassItem, 'id'>) => Promise<ClassItem | null>;
   onAutoCompleteReview?: (topic: string) => void;
 }
 
@@ -28,10 +29,12 @@ export default function Exercises({
   updateExercise,
   deleteExercise,
   classes = [],
+  addClass,
   onAutoCompleteReview
 }: ExercisesProps) {
   const isMountedRef = useRef(true);
-  const [topicInputMode, setTopicInputMode] = useState<'manual' | 'class'>('manual');
+  const [topicInputMode, setTopicInputMode] = useState<'manual' | 'class' | 'create_class'>('manual');
+  const [newClassPriority, setNewClassPriority] = useState<1 | 2 | 3>(2);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [newExercise, setNewExercise] = useState<Partial<ExerciseLog>>({
     date: getLocalDateString(),
@@ -48,7 +51,8 @@ export default function Exercises({
   const [editBlockName, setEditBlockName] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editArea, setEditArea] = useState<MedicalArea>(MedicalArea.CLINICA);
-  const [editTopicInputMode, setEditTopicInputMode] = useState<'manual' | 'class'>('manual');
+  const [editTopicInputMode, setEditTopicInputMode] = useState<'manual' | 'class' | 'create_class'>('manual');
+  const [editClassPriority, setEditClassPriority] = useState<1 | 2 | 3>(2);
   const [editSelectedClassId, setEditSelectedClassId] = useState<string>('');
   const [editTopic, setEditTopic] = useState('');
   const [editTotalQuestions, setEditTotalQuestions] = useState<number>(0);
@@ -61,6 +65,39 @@ export default function Exercises({
       isMountedRef.current = false;
     };
   }, []);
+
+  // Helper to find existing matching class or create a new class
+  const findOrCreateClass = async (
+    title: string,
+    area: MedicalArea,
+    date: string,
+    priority: 1 | 2 | 3
+  ): Promise<{ classId: string | null; isNew: boolean; existingTitle?: string }> => {
+    const normTitle = title.trim().toLowerCase();
+    const existing = classes.find(
+      c => c.area === area && c.title.trim().toLowerCase() === normTitle
+    );
+
+    if (existing) {
+      return { classId: existing.id, isNew: false, existingTitle: existing.title };
+    }
+
+    if (addClass) {
+      const created = await addClass({
+        title: title.trim(),
+        area,
+        date,
+        studied: true,
+        studied_date: date,
+        priority
+      });
+      if (created) {
+        return { classId: created.id, isNew: true };
+      }
+    }
+
+    return { classId: null, isNew: false };
+  };
 
   // Filter classes by selected area - REMOVED 'studied' filter to allow linking to any class
   const filteredClasses = useMemo(() => {
@@ -143,6 +180,7 @@ export default function Exercises({
     setEditArea(ex.area);
     setEditTopicInputMode(ex.classId ? 'class' : 'manual');
     setEditSelectedClassId(ex.classId || '');
+    setEditClassPriority(2);
     setEditTopic(ex.topic);
     setEditTotalQuestions(ex.totalQuestions);
     setEditCorrectAnswers(ex.correctAnswers);
@@ -189,8 +227,8 @@ export default function Exercises({
     }
 
     let finalArea = editArea;
-    let finalTopic = editTopic;
-    let finalClassId = null;
+    let finalTopic = editTopic.trim();
+    let finalClassId: string | null = null;
 
     if (editTopicInputMode === 'class' && editSelectedClassId) {
       const selectedClass = classes.find(c => c.id === editSelectedClassId);
@@ -198,6 +236,20 @@ export default function Exercises({
         finalArea = selectedClass.area;
         finalTopic = selectedClass.title;
         finalClassId = selectedClass.id;
+      }
+    } else if (editTopicInputMode === 'create_class') {
+      const res = await findOrCreateClass(finalTopic, editArea, editDate, editClassPriority);
+      finalClassId = res.classId;
+      if (res.isNew) {
+        toast({
+          title: "Aula criada com sucesso!",
+          description: `"${finalTopic}" foi registrada como aula e vinculada a este bloco.`,
+        });
+      } else if (res.existingTitle) {
+        toast({
+          title: "Aula existente vinculada",
+          description: `O bloco foi vinculado à aula já existente "${res.existingTitle}".`,
+        });
       }
     }
 
@@ -254,13 +306,39 @@ export default function Exercises({
       return;
     }
 
+    let targetClassId: string | null = null;
+    const finalTopic = newExercise.topic.trim();
+
+    if (topicInputMode === 'class' && selectedClassId) {
+      targetClassId = selectedClassId;
+    } else if (topicInputMode === 'create_class') {
+      const res = await findOrCreateClass(
+        finalTopic,
+        newExercise.area!,
+        newExercise.date!,
+        newClassPriority
+      );
+      targetClassId = res.classId;
+      if (res.isNew) {
+        toast({
+          title: "Aula criada com sucesso!",
+          description: `"${finalTopic}" foi registrada como aula estudada e integrada às revisões.`,
+        });
+      } else if (res.existingTitle) {
+        toast({
+          title: "Aula existente vinculada",
+          description: `O bloco foi vinculado à aula já existente "${res.existingTitle}".`,
+        });
+      }
+    }
+
     const item: Omit<ExerciseLog, 'id'> = {
       date: newExercise.date!,
       area: newExercise.area!,
-      topic: newExercise.topic,
+      topic: finalTopic,
       totalQuestions: newExercise.totalQuestions,
       correctAnswers: newExercise.correctAnswers!,
-      classId: topicInputMode === 'class' && selectedClassId ? selectedClassId : null,
+      classId: targetClassId,
       blockName: newExercise.blockName || null
     };
 
@@ -288,6 +366,7 @@ export default function Exercises({
     });
     setSelectedClassId('');
     setTopicInputMode('manual');
+    setNewClassPriority(2);
   };
 
   const handleDelete = async (id: string) => {
@@ -457,37 +536,45 @@ export default function Exercises({
             </div>
 
             <div className="space-y-2 lg:col-span-3">
-              <Label>Tópico</Label>
+              <Label>Tópico e Associação</Label>
               <div className="space-y-3">
                 <RadioGroup
                   value={topicInputMode}
                   onValueChange={(v) => {
-                    setTopicInputMode(v as 'manual' | 'class');
+                    setTopicInputMode(v as 'manual' | 'class' | 'create_class');
                     if (v === 'manual') {
                       setSelectedClassId('');
                       setNewExercise(prev => ({ ...prev, topic: '' }));
+                    } else if (v === 'create_class') {
+                      setSelectedClassId('');
                     }
                   }}
-                  className="flex gap-4"
+                  className="flex flex-wrap gap-4"
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="manual" id="manual" />
-                    <Label htmlFor="manual" className="cursor-pointer text-sm">Digite manualmente</Label>
+                    <Label htmlFor="manual" className="cursor-pointer text-sm font-normal">Manter sem aula</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="class" id="class" />
-                    <Label htmlFor="class" className="cursor-pointer text-sm">Selecionar de uma aula</Label>
+                    <Label htmlFor="class" className="cursor-pointer text-sm font-normal">Aula existente</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="create_class" id="create_class" />
+                    <Label htmlFor="create_class" className="cursor-pointer text-sm font-medium text-primary">✨ Cadastrar como aula</Label>
                   </div>
                 </RadioGroup>
 
-                {topicInputMode === 'manual' ? (
+                {topicInputMode === 'manual' && (
                   <Input
                     id="topic"
-                    placeholder="Ex: Hipertensão"
+                    placeholder="Ex: Hipertensão Arterial"
                     value={newExercise.topic}
                     onChange={(e) => setNewExercise({ ...newExercise, topic: e.target.value })}
                   />
-                ) : (
+                )}
+
+                {topicInputMode === 'class' && (
                   <Select
                     value={selectedClassId}
                     onValueChange={setSelectedClassId}
@@ -513,6 +600,42 @@ export default function Exercises({
                       )}
                     </SelectContent>
                   </Select>
+                )}
+
+                {topicInputMode === 'create_class' && (
+                  <div className="space-y-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="topic-create-title" className="text-xs font-semibold text-primary">Título / Nome da Aula</Label>
+                      <Input
+                        id="topic-create-title"
+                        placeholder="Ex: Hipertensão Arterial Sistêmica"
+                        value={newExercise.topic}
+                        onChange={(e) => setNewExercise({ ...newExercise, topic: e.target.value })}
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="new-class-priority" className="text-xs">Prioridade da Aula</Label>
+                        <Select
+                          value={String(newClassPriority)}
+                          onValueChange={(val) => setNewClassPriority(Number(val) as 1 | 2 | 3)}
+                        >
+                          <SelectTrigger id="new-class-priority" className="h-9 text-xs bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Alta ⚡</SelectItem>
+                            <SelectItem value="2">Média ⭐</SelectItem>
+                            <SelectItem value="3">Baixa 💤</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground self-center pt-1 leading-snug">
+                        Esta atividade criará uma aula em <strong>{newExercise.area}</strong> com a data real (<strong>{newExercise.date}</strong>) e agendará revisões futuras.
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -703,37 +826,44 @@ export default function Exercises({
             </div>
 
             <div className="space-y-2">
-              <Label>Tópico / Assunto</Label>
+              <Label>Tópico e Associação ao Conteúdo</Label>
               <div className="space-y-3">
                 <RadioGroup
                   value={editTopicInputMode}
                   onValueChange={(v) => {
-                    setEditTopicInputMode(v as 'manual' | 'class');
+                    setEditTopicInputMode(v as 'manual' | 'class' | 'create_class');
                     if (v === 'manual') {
                       setEditSelectedClassId('');
-                      setEditTopic('');
+                    } else if (v === 'create_class') {
+                      setEditSelectedClassId('');
                     }
                   }}
-                  className="flex gap-4"
+                  className="flex flex-wrap gap-4"
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="manual" id="edit-manual" />
-                    <Label htmlFor="edit-manual" className="cursor-pointer text-sm font-normal">Digite manualmente</Label>
+                    <Label htmlFor="edit-manual" className="cursor-pointer text-sm font-normal">Sem aula</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="class" id="edit-class" />
-                    <Label htmlFor="edit-class" className="cursor-pointer text-sm font-normal">Selecionar de uma aula</Label>
+                    <Label htmlFor="edit-class" className="cursor-pointer text-sm font-normal">Aula existente</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="create_class" id="edit-create-class" />
+                    <Label htmlFor="edit-create-class" className="cursor-pointer text-sm font-medium text-primary">✨ Cadastrar como aula</Label>
                   </div>
                 </RadioGroup>
 
-                {editTopicInputMode === 'manual' ? (
+                {editTopicInputMode === 'manual' && (
                   <Input
                     id="edit-topic"
                     placeholder="Ex: Hipertensão"
                     value={editTopic}
                     onChange={(e) => setEditTopic(e.target.value)}
                   />
-                ) : (
+                )}
+
+                {editTopicInputMode === 'class' && (
                   <Select
                     value={editSelectedClassId}
                     onValueChange={setEditSelectedClassId}
@@ -759,6 +889,42 @@ export default function Exercises({
                       )}
                     </SelectContent>
                   </Select>
+                )}
+
+                {editTopicInputMode === 'create_class' && (
+                  <div className="space-y-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-create-topic-title" className="text-xs font-semibold text-primary">Título / Nome da Aula</Label>
+                      <Input
+                        id="edit-create-topic-title"
+                        placeholder="Ex: Hipertensão Arterial Sistêmica"
+                        value={editTopic}
+                        onChange={(e) => setEditTopic(e.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-class-priority" className="text-xs">Prioridade da Aula</Label>
+                        <Select
+                          value={String(editClassPriority)}
+                          onValueChange={(val) => setEditClassPriority(Number(val) as 1 | 2 | 3)}
+                        >
+                          <SelectTrigger id="edit-class-priority" className="h-9 text-xs bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Alta ⚡</SelectItem>
+                            <SelectItem value="2">Média ⭐</SelectItem>
+                            <SelectItem value="3">Baixa 💤</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground self-center pt-1 leading-snug">
+                        Criará uma nova aula em <strong>{editArea}</strong> com a data do bloco (<strong>{editDate}</strong>).
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

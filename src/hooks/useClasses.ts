@@ -39,33 +39,43 @@ export function useClasses(userId: string | undefined) {
     fetchClasses();
   }, [fetchClasses]);
 
-  const addClass = async (classItem: Omit<ClassItem, 'id'>) => {
-    if (!userId) return;
+  const addClass = async (classItem: Omit<ClassItem, 'id'>): Promise<ClassItem | null> => {
+    if (!userId) return null;
+
+    const insertPayload: any = {
+      user_id: userId,
+      title: classItem.title,
+      specialty: classItem.area,
+      date: classItem.date,
+      priority: classItem.priority,
+      studied: classItem.studied
+    };
+
+    if (classItem.studied_date) {
+      insertPayload.studied_date = classItem.studied_date;
+    }
 
     const { data, error } = await supabase
       .from('classes')
-      .insert({
-        user_id: userId,
-        title: classItem.title,
-        specialty: classItem.area,
-        date: classItem.date,
-        priority: classItem.priority,
-        studied: classItem.studied
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
     if (error) {
       console.error('Error adding class:', error);
+      return null;
     } else {
-      setClasses(prev => [...prev, {
+      const created: ClassItem = {
         id: data.id,
         title: data.title,
         area: data.specialty as any,
         date: data.date,
         studied: data.studied,
-        priority: data.priority as 1 | 2 | 3
-      }]);
+        priority: data.priority as 1 | 2 | 3,
+        studied_date: data.studied_date || undefined
+      };
+      setClasses(prev => [...prev, created]);
+      return created;
     }
   };
 
