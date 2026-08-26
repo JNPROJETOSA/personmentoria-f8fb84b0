@@ -190,7 +190,6 @@ export function WeeklyAgenda({ userId, isAdminView = false, studentName }: Weekl
 
     setConflictTarget(null);
   };
-  const today = new Date().getDay();
 
   // Navigation functions
   const goToPreviousWeek = () => {
