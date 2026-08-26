@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Layers, Sparkles, Clock, RotateCw, Play } from 'lucide-react';
+import { BookOpen, Layers, Sparkles, Clock, RotateCw, Play, Eye } from 'lucide-react';
 import type { DeckStats } from '@/hooks/useSRS';
 
 interface DeckCardProps {
@@ -9,10 +9,11 @@ interface DeckCardProps {
   stats: DeckStats;
   onStudy: () => void;
   onFreeStudy: () => void;
+  onManage?: () => void;
   isFolder?: boolean;
 }
 
-export default function DeckCard({ name, stats, onStudy, onFreeStudy, isFolder }: DeckCardProps) {
+export default function DeckCard({ name, stats, onStudy, onFreeStudy, onManage, isFolder }: DeckCardProps) {
   const hasWork = stats.newCount > 0 || stats.learningCount > 0 || stats.dueCount > 0;
   const totalDue = stats.newCount + stats.learningCount + stats.dueCount;
 
@@ -61,6 +62,18 @@ export default function DeckCard({ name, stats, onStudy, onFreeStudy, isFolder }
 
           {/* Right: action buttons */}
           <div className="flex items-center gap-2 shrink-0">
+            {onManage && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onManage}
+                title="Ver e gerenciar flashcards deste baralho"
+                className="gap-1 px-2 text-xs"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Ver cards</span>
+              </Button>
+            )}
             {hasWork ? (
               <>
                 <Button 

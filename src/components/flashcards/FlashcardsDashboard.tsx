@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Plus, FolderPlus, RotateCw, Sparkles, Clock, Brain, 
-  ChevronDown, ChevronRight, Folder, FolderOpen, BookOpen, Flame
+  ChevronDown, ChevronRight, Folder, FolderOpen, BookOpen, Flame, FileText
 } from 'lucide-react';
 import DeckCard from './DeckCard';
 import type { Flashcard, MedicalArea } from '@/lib/types';
@@ -30,6 +30,8 @@ interface FlashcardsDashboardProps {
   onFreeStudyLooseCards: (area: string) => void;
   onCreateCard: () => void;
   onCreateFolder: () => void;
+  onManageFolder?: (folderId: string | null, area?: string) => void;
+  onManageAll?: () => void;
 }
 
 export default function FlashcardsDashboard({
@@ -44,6 +46,8 @@ export default function FlashcardsDashboard({
   onFreeStudyLooseCards,
   onCreateCard,
   onCreateFolder,
+  onManageFolder,
+  onManageAll,
 }: FlashcardsDashboardProps) {
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
 
@@ -139,9 +143,15 @@ export default function FlashcardsDashboard({
       </Card>
 
       {/* Actions Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Meus Baralhos</h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {onManageAll && (
+            <Button variant="outline" size="sm" onClick={onManageAll} className="gap-1.5">
+              <FileText className="w-4 h-4" />
+              Gerenciar Flashcards
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={onCreateFolder} className="gap-1.5">
             <FolderPlus className="w-4 h-4" />
             Nova Pasta
@@ -175,14 +185,28 @@ export default function FlashcardsDashboard({
         return (
           <div key={area} className="space-y-2">
             {/* Area Header */}
-            <button
-              onClick={() => toggleArea(area)}
-              className="flex items-center gap-2 w-full text-left py-2 px-1 hover:bg-muted/50 rounded-md transition-colors"
-            >
-              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              <span className="font-semibold text-sm">{area}</span>
-              <Badge variant="secondary" className="text-xs">{totalInArea} cards</Badge>
-            </button>
+            <div className="flex items-center justify-between py-1 px-1 hover:bg-muted/50 rounded-md transition-colors">
+              <button
+                onClick={() => toggleArea(area)}
+                className="flex items-center gap-2 text-left flex-1"
+              >
+                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                <span className="font-semibold text-sm">{area}</span>
+                <Badge variant="secondary" className="text-xs">{totalInArea} cards</Badge>
+              </button>
+
+              {onManageFolder && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onManageFolder(null, area)}
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Gerenciar Área
+                </Button>
+              )}
+            </div>
 
             {isExpanded && (
               <div className="space-y-2 pl-2">
@@ -199,6 +223,7 @@ export default function FlashcardsDashboard({
                       stats={stats}
                       onStudy={() => onStudyFolder(folder.id)}
                       onFreeStudy={() => onFreeStudyFolder(folder.id)}
+                      onManage={onManageFolder ? () => onManageFolder(folder.id, area) : undefined}
                       isFolder
                     />
                   );
@@ -211,6 +236,7 @@ export default function FlashcardsDashboard({
                     stats={getDeckStats(looseCards.map(c => c.id))}
                     onStudy={() => onStudyAll()}
                     onFreeStudy={() => onFreeStudyLooseCards(area)}
+                    onManage={onManageFolder ? () => onManageFolder(null, area) : undefined}
                   />
                 )}
               </div>

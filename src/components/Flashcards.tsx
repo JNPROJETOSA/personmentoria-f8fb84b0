@@ -32,6 +32,7 @@ import type { SRSRating } from '@/lib/fsrs';
 import FlashcardsDashboard from './flashcards/FlashcardsDashboard';
 import StudySessionComponent from './flashcards/StudySession';
 import SessionSummary from './flashcards/SessionSummary';
+import ManageFlashcardsDialog from './flashcards/ManageFlashcardsDialog';
 
 interface FlashcardsProps {
   flashcards: Flashcard[];
@@ -72,6 +73,21 @@ export default function Flashcards({
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [isEditingFolder, setIsEditingFolder] = useState<string | null>(null);
   const [isMoving, setIsMoving] = useState<string | null>(null);
+  const [isManaging, setIsManaging] = useState(false);
+  const [manageFolderId, setManageFolderId] = useState<string | null | undefined>(undefined);
+  const [manageArea, setManageArea] = useState<string | null | undefined>(undefined);
+
+  const handleOpenManageFolder = (folderId: string | null, area?: string) => {
+    setManageFolderId(folderId);
+    setManageArea(area ?? null);
+    setIsManaging(true);
+  };
+
+  const handleOpenManageAll = () => {
+    setManageFolderId(undefined);
+    setManageArea(undefined);
+    setIsManaging(true);
+  };
 
   const [newCard, setNewCard] = useState({
     area: MedicalArea.PEDIATRIA,
@@ -315,6 +331,7 @@ export default function Flashcards({
 
   const handleDelete = async (id: string) => {
     await deleteFlashcard(id);
+    await srs.refetch();
     if (isMountedRef.current) toast({ title: "Card excluído" });
   };
 
@@ -473,6 +490,22 @@ export default function Flashcards({
         onFreeStudyLooseCards={handleFreeStudyLooseCards}
         onCreateCard={() => setIsCreating(true)}
         onCreateFolder={() => setIsCreatingFolder(true)}
+        onManageFolder={handleOpenManageFolder}
+        onManageAll={handleOpenManageAll}
+      />
+
+      {/* ═══ Manage Flashcards Dialog ═══ */}
+      <ManageFlashcardsDialog
+        open={isManaging}
+        onOpenChange={setIsManaging}
+        flashcards={flashcards}
+        folders={folders}
+        initialFolderId={manageFolderId}
+        initialArea={manageArea}
+        onEditCard={handleStartEdit}
+        onDeleteCard={handleDelete}
+        srsMap={srs.srsMap}
+        getImageUrl={getImageUrl}
       />
 
       {/* ═══ Create Card Dialog (preserved) ═══ */}
